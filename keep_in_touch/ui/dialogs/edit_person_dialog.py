@@ -2,9 +2,10 @@
 
 from datetime import date
 
-from PySide6.QtCore import QDate
+from PySide6.QtCore import QDate, Qt
 from PySide6.QtWidgets import (
     QComboBox,
+    QCompleter,
     QDateEdit,
     QDialog,
     QDialogButtonBox,
@@ -20,7 +21,11 @@ from PySide6.QtWidgets import (
 )
 
 from keep_in_touch.domain.display import social_lines
-from keep_in_touch.domain.models import Person, RELATIONSHIP_OPTIONS
+from keep_in_touch.domain.models import (
+    PREFERRED_CONTACT_METHOD_OPTIONS,
+    Person,
+    RELATIONSHIP_OPTIONS,
+)
 from keep_in_touch.domain.validation import (
     normalize_relationship,
     normalize_socials,
@@ -65,7 +70,7 @@ class EditPersonDialog(QDialog):
         relationship = person.relationship if person else RELATIONSHIP_OPTIONS[0]
         self.relationship_combo.setCurrentText(normalize_relationship(relationship))
 
-        self.method_edit = QLineEdit(
+        self.preferred_contact_method_combo = _contact_method_combo(
             person.preferred_contact_method if person else "",
         )
         self.socials_summary_label = QLabel()
@@ -88,7 +93,10 @@ class EditPersonDialog(QDialog):
         form.addRow("Birthday (YYYY-MM-DD)", self.birthday_edit)
         form.addRow("Tags", self.tags_edit)
         form.addRow("Relationship", self.relationship_combo)
-        form.addRow("Preferred method", self.method_edit)
+        form.addRow(
+            "Preferred contact method",
+            self.preferred_contact_method_combo,
+        )
         form.addRow("Social handles", self._create_socials_row())
         form.addRow("Last contacted (YYYY-MM-DD)", self.last_contacted_edit)
         form.addRow("Bio", self.bio_edit)
@@ -129,7 +137,9 @@ class EditPersonDialog(QDialog):
             birthday=_date_from_optional_edit(self.birthday_edit),
             tags=normalize_tags(self.tags_edit.text()),
             relationship=normalize_relationship(self.relationship_combo.currentText()),
-            preferred_contact_method=self.method_edit.text().strip(),
+            preferred_contact_method=_contact_method_from_combo(
+                self.preferred_contact_method_combo,
+            ),
             socials=normalize_socials(self.socials),
             contact_interval_days=existing.contact_interval_days if existing else 30,
             last_contacted_at=_date_from_optional_edit(self.last_contacted_edit),
@@ -186,6 +196,67 @@ def _optional_date_edit(value: date | None) -> QDateEdit:
     edit.setCalendarPopup(True)
     edit.setDisplayFormat("yyyy-MM-dd")
     return edit
+
+
+def _contact_method_combo(current_value: str) -> QComboBox:
+    """Create the searchable preferred contact method selector."""
+
+    combo = QComboBox()
+    combo.setEditable(True)
+    combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+    combo.addItem("Not set", "")
+    for key, label in PREFERRED_CONTACT_METHOD_OPTIONS:
+        combo.addItem(label, key)
+
+    current_index = _contact_method_index(combo, current_value)
+    if current_index >= 0:
+        combo.setCurrentIndex(current_index)
+    elif current_value.strip():
+        combo.addItem(current_value.strip(), current_value.strip())
+        combo.setCurrentIndex(combo.count() - 1)
+
+    completer = combo.completer()
+    if completer is not None:
+        completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        completer.setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
+
+    return combo
+
+
+def _contact_method_index(combo: QComboBox, value: str) -> int:
+    """Return the matching combo index for a stored key, label, or unique prefix."""
+
+    clean_value = value.strip().casefold()
+    if not clean_value:
+        return 0
+
+    prefix_matches: list[int] = []
+    for index in range(combo.count()):
+        item_key = str(combo.itemData(index) or "").casefold()
+        item_label = combo.itemText(index).casefold()
+        if clean_value in {item_key, item_label}:
+            return index
+        if item_key.startswith(clean_value) or item_label.startswith(clean_value):
+            prefix_matches.append(index)
+
+    if len(prefix_matches) == 1:
+        return prefix_matches[0]
+    return -1
+
+
+def _contact_method_from_combo(combo: QComboBox) -> str:
+    """Return the stored key for the selected or typed contact method."""
+
+    typed_text = combo.currentText().strip()
+    match_index = _contact_method_index(combo, typed_text)
+    if match_index >= 0:
+        matched_key = combo.itemData(match_index)
+        return str(matched_key or "").strip()
+
+    selected_key = combo.currentData()
+    if isinstance(selected_key, str):
+        return selected_key.strip()
+    return typed_text
 
 
 def _qdate_from_date(value: date | None) -> QDate:

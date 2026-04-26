@@ -66,7 +66,7 @@ def print_report(people: list[dict[str, Any]], today: date) -> None:
     print(f"Analysis date:   {today.isoformat()}")
     print()
     print_counter("Relationships", relationship_counts(people))
-    print_counter("Preferred methods", preferred_method_counts(people))
+    print_counter("Preferred contact methods", preferred_method_counts(people))
     print_counter("Most common tags", tag_counts(people), limit=10)
     print_counter("Social platform coverage", social_platform_counts(people))
     print_contact_field_coverage(people)

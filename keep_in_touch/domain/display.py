@@ -3,7 +3,11 @@
 from datetime import date
 
 from keep_in_touch.domain.formulas import days_since_contact
-from keep_in_touch.domain.models import Person, SOCIAL_PLATFORMS
+from keep_in_touch.domain.models import (
+    PREFERRED_CONTACT_METHOD_OPTIONS,
+    Person,
+    SOCIAL_PLATFORMS,
+)
 
 
 def middle_name(person: Person) -> str:
@@ -78,3 +82,16 @@ def contact_age_text(person: Person, today: date) -> str:
         return "Contacted today"
     suffix = "day" if days == 1 else "days"
     return f"{days} {suffix} since contact"
+
+
+def contact_method_label(value: str, fallback: str = "-") -> str:
+    """Return a friendly label for a stored preferred contact method key."""
+
+    clean_value = value.strip()
+    if not clean_value:
+        return fallback
+
+    labels = {
+        key.casefold(): label for key, label in PREFERRED_CONTACT_METHOD_OPTIONS
+    }
+    return labels.get(clean_value.casefold(), clean_value.replace("_", " ").title())

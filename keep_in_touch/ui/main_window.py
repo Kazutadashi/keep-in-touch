@@ -27,6 +27,7 @@ from keep_in_touch.app.app_config import AppConfig
 from keep_in_touch.domain.date_utils import today_local
 from keep_in_touch.domain.display import (
     contact_age_text,
+    contact_method_label,
     date_text,
     display_name,
     social_lines,
@@ -694,7 +695,8 @@ class MainWindow(QMainWindow):
             f"Email: {person.email or '-'}",
             f"Phone: {person.phone or '-'}",
             f"Relationship: {person.relationship or '-'}",
-            f"Preferred method: {person.preferred_contact_method or '-'}",
+            "Preferred contact method: "
+            f"{contact_method_label(person.preferred_contact_method)}",
             f"Last contacted: {date_text(person.last_contacted_at)}",
             f"Days since contact: {contact_age_text(person, today_local())}",
             f"Tags: {tags_text(person)}",

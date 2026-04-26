@@ -49,6 +49,18 @@ without requiring a schema migration.
 """
 
 
+PREFERRED_CONTACT_METHOD_OPTIONS = [
+    ("email", "Email"),
+    ("phone", "Phone"),
+    *SOCIAL_PLATFORMS,
+]
+"""Contact methods available in preferred contact method selectors.
+
+Values are stored as stable lowercase keys. Labels are only for display, which
+keeps exports easy to analyze while preserving a pleasant UI.
+"""
+
+
 @dataclass
 class Person:
     """Represents one person in the relationship tracker.
