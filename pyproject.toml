@@ -4,11 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "keep-in-touch"
-version = "0.1.0"
+version = "2026.4.26.1648"
 description = "A local-first personal relationship tracker built with PySide6 and plain text data files."
 readme = "README.md"
 requires-python = ">=3.11"
-authors = [{ name = "Keep in Touch Contributors" }]
+authors = [{ name = "Kazutadashi" }]
 license = { text = "MIT" }
 dependencies = [
     "PySide6>=6.7",

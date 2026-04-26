@@ -8,6 +8,7 @@ from PySide6.QtWidgets import QTextEdit
 from keep_in_touch.domain.display import (
     contact_age_text,
     contact_method_label,
+    birthday_text,
     date_text,
     display_name,
     middle_name,
@@ -54,7 +55,7 @@ class PersonDetailPanel(QTextEdit):
             _field("Middle name", middle_name(person)),
             _field("Last name", person.last_name),
             _field("Nickname", person.nickname),
-            _field("Birthday", date_text(person.birthday)),
+            _field("Birthday", birthday_text(person, date.today())),
             "",
             _section("Connection"),
             _field("Email", person.email),
@@ -92,17 +93,27 @@ class PersonDetailPanel(QTextEdit):
 
 
 def _title(text: str) -> str:
-    """Return an ASCII title block."""
+    """Return a text title block."""
 
-    border = "+" + "=" * PANEL_WIDTH + "+"
-    return "\n".join([border, _boxed_line(text.upper()), border])
+    return "\n".join(
+        [
+            _border("╔", "═", "╗"),
+            _boxed_line(text.upper()),
+            _border("╚", "═", "╝"),
+        ]
+    )
 
 
 def _section(text: str) -> str:
-    """Return a prominent ASCII section heading."""
+    """Return a prominent text section heading."""
 
-    border = "+" + "-" * PANEL_WIDTH + "+"
-    return "\n".join([border, _boxed_line(text), border])
+    return "\n".join(
+        [
+            _border("┌", "─", "┐"),
+            _boxed_line(text),
+            _border("└", "─", "┘"),
+        ]
+    )
 
 
 def _subsection(text: str) -> str:
@@ -112,18 +123,17 @@ def _subsection(text: str) -> str:
 
 
 def _interaction_block(interaction: Interaction) -> list[str]:
-    """Return a visually separated ASCII block for one interaction."""
+    """Return an indented readable block for one interaction."""
 
     title = f"{interaction.date.isoformat()} - {interaction.interaction_type or 'interaction'}"
     return [
-        _minor_border(),
-        _boxed_line(title),
-        _minor_border(),
-        _field("Interaction ID", interaction.id),
-        _field("Date", interaction.date.isoformat()),
-        _field("Type", interaction.interaction_type or "interaction"),
-        _field("Summary", interaction.summary),
-        _field("Follow-up", interaction.follow_up_notes),
+        f"  ── {title}",
+        f"     id   │ {interaction.id}",
+        "     summary",
+        *_note_lines(interaction.summary, indent="       "),
+        "",
+        "     follow-up",
+        *_note_lines(interaction.follow_up_notes, indent="       "),
     ]
 
 
@@ -131,7 +141,7 @@ def _field(label: str, value: object) -> str:
     """Return an aligned label/value row."""
 
     text = str(value).strip() if value is not None else ""
-    return f"  {label.upper().ljust(LABEL_WIDTH)} | {text or '-'}"
+    return f"  {label.ljust(LABEL_WIDTH)} │ {text or '-'}"
 
 
 def _block(text: str) -> str:
@@ -159,13 +169,25 @@ def _empty(text: str = "-") -> str:
 
 
 def _boxed_line(text: str) -> str:
-    """Return text padded inside a fixed-width ASCII box."""
+    """Return text padded inside a fixed-width box."""
 
     clipped = text[: PANEL_WIDTH - 2]
-    return f"| {clipped.ljust(PANEL_WIDTH - 2)} |"
+    return f"│ {clipped.ljust(PANEL_WIDTH - 2)} │"
 
 
-def _minor_border() -> str:
-    """Return a lighter fixed-width border for repeated blocks."""
+def _border(left: str, fill: str, right: str) -> str:
+    """Return a fixed-width box border."""
 
-    return "+" + "." * PANEL_WIDTH + "+"
+    return left + fill * PANEL_WIDTH + right
+
+
+def _note_lines(text: str, indent: str) -> list[str]:
+    """Return readable note lines for interaction summary fields."""
+
+    stripped = text.strip()
+    if not stripped:
+        return [f"{indent}-"]
+    return [
+        f"{indent}{line}" if line else indent.rstrip()
+        for line in stripped.splitlines()
+    ]

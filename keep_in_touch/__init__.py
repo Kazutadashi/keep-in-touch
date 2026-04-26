@@ -1,3 +1,4 @@
 """Keep in Touch package."""
 
-__version__ = "0.1.0"
+__author__ = "Kazutadashi"
+__version__ = "2026.4.26.1648"

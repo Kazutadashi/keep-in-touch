@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from keep_in_touch import __author__, __version__
 from keep_in_touch.app.app_config import AppConfig
 from keep_in_touch.domain.date_utils import today_local
 from keep_in_touch.domain.display import (
@@ -563,7 +564,9 @@ class MainWindow(QMainWindow):
             (
                 "Keep in Touch is a local-first personal relationship tracking "
                 "application. Data is stored as portable text files in a folder "
-                "you choose."
+                "you choose.\n\n"
+                f"Version: {__version__}\n"
+                f"Author: {__author__}"
             ),
         )
 

@@ -190,7 +190,7 @@ class PeopleTable(QTableWidget):
         ),
         PeopleTableColumn(
             "Birthday",
-            145,
+            150,
             _birthday_cell,
             _birthday_sort_value,
             _decorate_birthday_cell,

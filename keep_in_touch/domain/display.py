@@ -1,6 +1,5 @@
 """Display-oriented helpers for domain models."""
 
-from calendar import month_abbr
 from datetime import date
 
 from keep_in_touch.domain.formulas import days_since_contact
@@ -74,45 +73,30 @@ def days_until_birthday(person: Person, today: date) -> int | None:
 
 
 def birthday_text(person: Person, today: date) -> str:
-    """Return compact birthday text for table display."""
+    """Return birthday text in ISO 8601 date format."""
 
-    days = days_until_birthday(person, today)
-    if days is None:
-        return ""
-    if days == 0:
-        return "Today"
-    if days == 1:
-        return "Tomorrow"
-    if days <= 30:
-        return f"In {days} days"
     birthday = person.birthday
     if birthday is None:
         return ""
-    return f"{month_abbr[birthday.month]} {birthday.day}"
+    return birthday.isoformat()
 
 
 def days_since_contact_text(person: Person, today: date) -> str:
-    """Return a compact days-since-contact value for display."""
+    """Return a numeric days-since-contact value for display."""
 
     days = days_since_contact(person, today)
     if days is None:
         return "Never"
-    if days == 0:
-        return "Today"
-    suffix = "day" if days == 1 else "days"
-    return f"{days} {suffix}"
+    return str(days)
 
 
 def contact_age_text(person: Person, today: date) -> str:
-    """Return a sentence-like contact age value for detail views."""
+    """Return a numeric days-since-contact value for detail views."""
 
     days = days_since_contact(person, today)
     if days is None:
-        return "Never contacted"
-    if days == 0:
-        return "Contacted today"
-    suffix = "day" if days == 1 else "days"
-    return f"{days} {suffix} since contact"
+        return "Never"
+    return str(days)
 
 
 def contact_method_label(value: str, fallback: str = "-") -> str:
