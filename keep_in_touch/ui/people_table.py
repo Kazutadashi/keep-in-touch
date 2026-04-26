@@ -9,12 +9,15 @@ from PySide6.QtCore import QPoint, Qt, Signal
 from PySide6.QtGui import QMouseEvent
 from PySide6.QtWidgets import QHeaderView, QTableWidget, QTableWidgetItem
 
+from keep_in_touch.domain.formulas import days_since_contact
 from keep_in_touch.domain.display import (
     days_since_contact_text,
     display_name,
     tags_text,
 )
 from keep_in_touch.domain.models import Person
+
+PERSON_ID_ROLE = Qt.ItemDataRole.UserRole + 1
 
 
 @dataclass(frozen=True)
@@ -24,6 +27,18 @@ class PeopleTableColumn:
     header: str
     width: int
     value: Callable[[Person, date], str]
+    sort_value: Callable[[Person, date], object]
+
+
+class SortableTableItem(QTableWidgetItem):
+    """Table item that sorts by an explicit sort value."""
+
+    def __lt__(self, other: QTableWidgetItem) -> bool:
+        """Compare items using their display sort data."""
+
+        left = self.data(Qt.ItemDataRole.UserRole)
+        right = other.data(Qt.ItemDataRole.UserRole)
+        return left < right
 
 
 def _name_cell(person: Person, today: date) -> str:
@@ -32,10 +47,23 @@ def _name_cell(person: Person, today: date) -> str:
     return display_name(person)
 
 
+def _name_sort_value(person: Person, today: date) -> str:
+    """Return name sort value."""
+
+    return display_name(person).lower()
+
+
 def _days_since_contact_cell(person: Person, today: date) -> str:
     """Return days-since-contact column text."""
 
     return days_since_contact_text(person, today)
+
+
+def _days_since_contact_sort_value(person: Person, today: date) -> int:
+    """Return numeric days-since-contact sort value."""
+
+    days = days_since_contact(person, today)
+    return days if days is not None else 10_000_000
 
 
 def _relationship_cell(person: Person, today: date) -> str:
@@ -44,10 +72,22 @@ def _relationship_cell(person: Person, today: date) -> str:
     return person.relationship
 
 
+def _relationship_sort_value(person: Person, today: date) -> str:
+    """Return relationship sort value."""
+
+    return person.relationship.lower()
+
+
 def _tags_cell(person: Person, today: date) -> str:
     """Return tags column text."""
 
     return tags_text(person, "")
+
+
+def _tags_sort_value(person: Person, today: date) -> str:
+    """Return tags sort value."""
+
+    return tags_text(person, "").lower()
 
 
 class PeopleTable(QTableWidget):
@@ -69,10 +109,20 @@ class PeopleTable(QTableWidget):
     selection_cleared = Signal()
 
     COLUMNS: ClassVar[list[PeopleTableColumn]] = [
-        PeopleTableColumn("Name", 210, _name_cell),
-        PeopleTableColumn("Days Since Contact", 160, _days_since_contact_cell),
-        PeopleTableColumn("Relationship", 130, _relationship_cell),
-        PeopleTableColumn("Tags", 220, _tags_cell),
+        PeopleTableColumn("Name", 210, _name_cell, _name_sort_value),
+        PeopleTableColumn(
+            "Days Since Contact",
+            160,
+            _days_since_contact_cell,
+            _days_since_contact_sort_value,
+        ),
+        PeopleTableColumn(
+            "Relationship",
+            130,
+            _relationship_cell,
+            _relationship_sort_value,
+        ),
+        PeopleTableColumn("Tags", 220, _tags_cell, _tags_sort_value),
     ]
     WIDTH_PADDING = 36
 
@@ -84,6 +134,7 @@ class PeopleTable(QTableWidget):
         self.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.setSortingEnabled(True)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.verticalHeader().setVisible(False)
         self.setHorizontalScrollMode(QTableWidget.ScrollMode.ScrollPerPixel)
@@ -128,17 +179,24 @@ class PeopleTable(QTableWidget):
     def set_people(self, people: list[Person], today: date) -> None:
         """Replace the table content with a list of people."""
 
+        sorting_was_enabled = self.isSortingEnabled()
+        self.setSortingEnabled(False)
         self.setRowCount(0)
         for person in people:
             row = self.rowCount()
             self.insertRow(row)
             for column, table_column in enumerate(self.COLUMNS):
                 cell_text = table_column.value(person, today)
-                item = QTableWidgetItem(cell_text)
+                item = SortableTableItem(cell_text)
                 item.setToolTip(cell_text)
+                item.setData(
+                    Qt.ItemDataRole.UserRole,
+                    table_column.sort_value(person, today),
+                )
                 if column == 0:
-                    item.setData(Qt.ItemDataRole.UserRole, person.id)
+                    item.setData(PERSON_ID_ROLE, person.id)
                 self.setItem(row, column, item)
+        self.setSortingEnabled(sorting_was_enabled)
 
     def selected_person_id(self) -> str | None:
         """Return the selected person ID, if any."""
@@ -152,7 +210,7 @@ class PeopleTable(QTableWidget):
         if item is None:
             return None
 
-        value = item.data(Qt.ItemDataRole.UserRole)
+        value = item.data(PERSON_ID_ROLE)
         return str(value) if value else None
 
     def person_id_at_position(self, position: QPoint) -> str | None:
@@ -166,7 +224,7 @@ class PeopleTable(QTableWidget):
         if first_column_item is None:
             return None
 
-        value = first_column_item.data(Qt.ItemDataRole.UserRole)
+        value = first_column_item.data(PERSON_ID_ROLE)
         return str(value) if value else None
 
     def select_person_at_position(self, position: QPoint) -> str | None:
@@ -196,6 +254,6 @@ class PeopleTable(QTableWidget):
         if first_column_item is None:
             return
 
-        value = first_column_item.data(Qt.ItemDataRole.UserRole)
+        value = first_column_item.data(PERSON_ID_ROLE)
         if value:
             self.person_double_clicked.emit(str(value))

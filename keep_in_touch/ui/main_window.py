@@ -41,7 +41,7 @@ from keep_in_touch.storage.app_settings import save_remembered_data_dir
 from keep_in_touch.storage.jsonl_store import JsonlStore
 from keep_in_touch.ui.dialogs.edit_person_dialog import EditPersonDialog
 from keep_in_touch.ui.dialogs.log_interaction_dialog import LogInteractionDialog
-from keep_in_touch.ui.people_table import PeopleTable
+from keep_in_touch.ui.people_table import PERSON_ID_ROLE, PeopleTable
 from keep_in_touch.ui.person_detail_panel import PersonDetailPanel
 
 NO_DATA_FOLDER_MESSAGE = (
@@ -724,7 +724,7 @@ class MainWindow(QMainWindow):
 
         for row in range(self.people_table.rowCount()):
             item = self.people_table.item(row, 0)
-            if item is not None and item.data(Qt.ItemDataRole.UserRole) == person_id:
+            if item is not None and item.data(PERSON_ID_ROLE) == person_id:
                 self.people_table.selectRow(row)
                 return
 
