@@ -40,7 +40,7 @@ def normalize_contact_interval_days(value: object, default: int = 30) -> int:
     """
 
     try:
-        parsed = int(value)  # type: ignore[arg-type]
+        parsed = int(str(value))
     except (TypeError, ValueError):
         parsed = default
     return max(1, parsed)

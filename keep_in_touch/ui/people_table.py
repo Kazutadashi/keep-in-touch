@@ -9,6 +9,7 @@ from PySide6.QtCore import QPoint, Qt, Signal
 from PySide6.QtGui import QMouseEvent
 from PySide6.QtWidgets import QHeaderView, QTableWidget, QTableWidgetItem
 
+from keep_in_touch.domain.display import contact_status, display_name, tags_text
 from keep_in_touch.domain.models import Person
 
 
@@ -19,6 +20,36 @@ class PeopleTableColumn:
     header: str
     width: int
     value: Callable[[Person, date], str]
+
+
+def _name_cell(person: Person, today: date) -> str:
+    """Return name column text."""
+
+    return display_name(person)
+
+
+def _next_contact_cell(person: Person, today: date) -> str:
+    """Return next-contact column text."""
+
+    return person.next_contact_at.isoformat() if person.next_contact_at else "Not set"
+
+
+def _status_cell(person: Person, today: date) -> str:
+    """Return status column text."""
+
+    return contact_status(person, today)
+
+
+def _relationship_cell(person: Person, today: date) -> str:
+    """Return relationship column text."""
+
+    return person.relationship
+
+
+def _tags_cell(person: Person, today: date) -> str:
+    """Return tags column text."""
+
+    return tags_text(person, "")
 
 
 class PeopleTable(QTableWidget):
@@ -40,31 +71,17 @@ class PeopleTable(QTableWidget):
     selection_cleared = Signal()
 
     COLUMNS: ClassVar[list[PeopleTableColumn]] = [
-        PeopleTableColumn("Name", 210, lambda person, today: display_name(person)),
-        PeopleTableColumn(
-            "Next Contact",
-            120,
-            lambda person, today: (
-                person.next_contact_at.isoformat()
-                if person.next_contact_at
-                else "Not set"
-            ),
-        ),
-        PeopleTableColumn(
-            "Status",
-            110,
-            lambda person, today: contact_status(person, today),
-        ),
-        PeopleTableColumn(
-            "Relationship",
-            130,
-            lambda person, today: person.relationship,
-        ),
-        PeopleTableColumn("Tags", 220, lambda person, today: ", ".join(person.tags)),
+        PeopleTableColumn("Name", 210, _name_cell),
+        PeopleTableColumn("Next Contact", 120, _next_contact_cell),
+        PeopleTableColumn("Status", 110, _status_cell),
+        PeopleTableColumn("Relationship", 130, _relationship_cell),
+        PeopleTableColumn("Tags", 220, _tags_cell),
     ]
     WIDTH_PADDING = 36
 
     def __init__(self) -> None:
+        """Create the table and configure selection and column behavior."""
+
         super().__init__(0, len(self.COLUMNS))
         self.setHorizontalHeaderLabels([column.header for column in self.COLUMNS])
         self.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
@@ -119,9 +136,9 @@ class PeopleTable(QTableWidget):
             row = self.rowCount()
             self.insertRow(row)
             for column, table_column in enumerate(self.COLUMNS):
-                value = table_column.value(person, today)
-                item = QTableWidgetItem(value)
-                item.setToolTip(value)
+                cell_text = table_column.value(person, today)
+                item = QTableWidgetItem(cell_text)
+                item.setToolTip(cell_text)
                 if column == 0:
                     item.setData(Qt.ItemDataRole.UserRole, person.id)
                 self.setItem(row, column, item)
@@ -185,34 +202,3 @@ class PeopleTable(QTableWidget):
         value = first_column_item.data(Qt.ItemDataRole.UserRole)
         if value:
             self.person_double_clicked.emit(str(value))
-
-
-def display_name(person: Person) -> str:
-    """Return the table display name, including future middle-name data if present."""
-
-    middle_name = person.extra_fields.get(
-        "middle_name",
-        person.extra_fields.get("middle", ""),
-    )
-    parts = [person.first_name, str(middle_name), person.last_name]
-    return " ".join(part.strip() for part in parts if part.strip()) or "(Unnamed)"
-
-
-def contact_status(person: Person, today: date) -> str:
-    """Return a compact contact status for the table."""
-
-    if person.last_contacted_at is None:
-        return "Never contacted"
-    if person.next_contact_at is None:
-        return "Not scheduled"
-
-    days_until_contact = (person.next_contact_at - today).days
-    if days_until_contact < 0:
-        days_overdue_count = abs(days_until_contact)
-        suffix = "day" if days_overdue_count == 1 else "days"
-        return f"{days_overdue_count} {suffix} overdue"
-    if days_until_contact == 0:
-        return "Due today"
-
-    suffix = "day" if days_until_contact == 1 else "days"
-    return f"In {days_until_contact} {suffix}"

@@ -27,6 +27,8 @@ class EditPersonDialog(QDialog):
     """
 
     def __init__(self, person: Person | None = None) -> None:
+        """Create the dialog, optionally prefilled with an existing person."""
+
         super().__init__()
         self.setWindowTitle("Edit Person" if person else "Add Person")
         self._person = person
@@ -88,19 +90,27 @@ class EditPersonDialog(QDialog):
             QMessageBox.warning(self, "Missing first name", "First name is required.")
             return
 
+        invalid_date_label = self._first_invalid_date_label()
+        if invalid_date_label is not None:
+            QMessageBox.warning(
+                self,
+                "Invalid date",
+                f"{invalid_date_label} must use YYYY-MM-DD format.",
+            )
+            return
+
+        super().accept()
+
+    def _first_invalid_date_label(self) -> str | None:
+        """Return the first date field label with invalid text."""
+
         for label, value in (
             ("Birthday", self.birthday_edit.text()),
             ("Last contacted", self.last_contacted_edit.text()),
         ):
             if value.strip() and parse_date(value) is None:
-                QMessageBox.warning(
-                    self,
-                    "Invalid date",
-                    f"{label} must use YYYY-MM-DD format.",
-                )
-                return
-
-        super().accept()
+                return label
+        return None
 
     def to_person(self) -> Person:
         """Return dialog values as a Person."""

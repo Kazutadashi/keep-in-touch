@@ -6,7 +6,11 @@ from pathlib import Path
 from typing import Any
 
 
-def write_csv(path: Path, rows: Iterable[Mapping[str, Any]], fieldnames: list[str]) -> None:
+def write_csv(
+    path: Path,
+    rows: Iterable[Mapping[str, Any]],
+    fieldnames: list[str],
+) -> None:
     """Write dictionaries to a CSV file.
 
     Args:

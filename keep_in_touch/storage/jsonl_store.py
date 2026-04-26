@@ -21,6 +21,8 @@ class JsonlStore:
     """
 
     def __init__(self, path: Path) -> None:
+        """Create a store for a JSONL file path."""
+
         self.path = path
 
     def read_all(self) -> list[dict[str, Any]]:
@@ -68,7 +70,12 @@ class JsonlStore:
             ) as temp_file:
                 temp_name = temp_file.name
                 for record in records:
-                    temp_file.write(json.dumps(record, ensure_ascii=False, sort_keys=True))
+                    encoded_record = json.dumps(
+                        record,
+                        ensure_ascii=False,
+                        sort_keys=True,
+                    )
+                    temp_file.write(encoded_record)
                     temp_file.write("\n")
             os.replace(temp_name, self.path)
         finally:

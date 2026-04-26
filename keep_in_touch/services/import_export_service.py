@@ -59,13 +59,18 @@ class ImportExportService:
         people_service: PeopleService,
         interaction_service: InteractionService,
     ) -> None:
+        """Create the service from people and interaction workflows."""
+
         self.people_service = people_service
         self.interaction_service = interaction_service
 
     def export_people_csv(self, path: Path, today: date) -> None:
         """Export people to CSV."""
 
-        rows = [person_to_record(person) for person in self.people_service.list_people(today)]
+        rows = [
+            person_to_record(person)
+            for person in self.people_service.list_people(today)
+        ]
         write_csv(path, rows, PEOPLE_CSV_FIELDS)
 
     def export_interactions_csv(self, path: Path) -> None:
@@ -143,9 +148,10 @@ def _normalize_people_csv_row(row: dict[str, str]) -> dict[str, Any]:
         target = aliases.get(clean_key, clean_key)
         normalized[target] = value.strip() if isinstance(value, str) else value
 
-    if ("first_name" not in normalized and "last_name" not in normalized) and normalized.get(
-        "name"
-    ):
+    missing_split_name = (
+        "first_name" not in normalized and "last_name" not in normalized
+    )
+    if missing_split_name and normalized.get("name"):
         first_name, last_name = split_full_name(normalized["name"])
         normalized["first_name"] = first_name
         normalized["last_name"] = last_name

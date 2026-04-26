@@ -69,13 +69,9 @@ def person_from_record(record: Mapping[str, Any]) -> Person:
         assert person.last_name == "Doe"
     """
 
-    extra_fields = {key: value for key, value in record.items() if key not in PERSON_FIELDS}
-
-    urgency_raw = record.get("urgency_score", 0.0)
-    try:
-        urgency_score = float(urgency_raw)
-    except (TypeError, ValueError):
-        urgency_score = 0.0
+    extra_fields = {
+        key: value for key, value in record.items() if key not in PERSON_FIELDS
+    }
 
     first_name = normalize_text(record.get("first_name"))
     last_name = normalize_text(record.get("last_name"))
@@ -86,7 +82,7 @@ def person_from_record(record: Mapping[str, Any]) -> Person:
     relationship_value = record.get("relationship", record.get("relationship_type"))
 
     return Person(
-        schema_version=int(record.get("schema_version", 1) or 1),
+        schema_version=_int_from_record(record, "schema_version", 1),
         id=normalize_text(record.get("id")),
         first_name=first_name,
         last_name=last_name,
@@ -101,9 +97,9 @@ def person_from_record(record: Mapping[str, Any]) -> Person:
         ),
         last_contacted_at=parse_date(record.get("last_contacted_at")),
         next_contact_at=parse_date(record.get("next_contact_at")),
-        urgency_score=urgency_score,
+        urgency_score=_float_from_record(record, "urgency_score", 0.0),
         notes=normalize_text(record.get("notes")),
-        formula_version=int(record.get("formula_version", 1) or 1),
+        formula_version=_int_from_record(record, "formula_version", 1),
         created_at=parse_datetime(record.get("created_at")),
         updated_at=parse_datetime(record.get("updated_at")),
         extra_fields=extra_fields,
@@ -171,7 +167,7 @@ def interaction_from_record(record: Mapping[str, Any]) -> Interaction | None:
         key: value for key, value in record.items() if key not in INTERACTION_FIELDS
     }
     return Interaction(
-        schema_version=int(record.get("schema_version", 1) or 1),
+        schema_version=_int_from_record(record, "schema_version", 1),
         id=interaction_id,
         person_id=person_id,
         date=interaction_date,
@@ -235,3 +231,29 @@ def split_full_name(value: object) -> tuple[str, str]:
     first_name = parts[0]
     last_name = parts[1] if len(parts) > 1 else ""
     return first_name, last_name
+
+
+def _int_from_record(
+    record: Mapping[str, Any],
+    key: str,
+    default: int,
+) -> int:
+    """Return an integer record value with a fallback."""
+
+    try:
+        return int(record.get(key, default) or default)
+    except (TypeError, ValueError):
+        return default
+
+
+def _float_from_record(
+    record: Mapping[str, Any],
+    key: str,
+    default: float,
+) -> float:
+    """Return a float record value with a fallback."""
+
+    try:
+        return float(record.get(key, default) or default)
+    except (TypeError, ValueError):
+        return default

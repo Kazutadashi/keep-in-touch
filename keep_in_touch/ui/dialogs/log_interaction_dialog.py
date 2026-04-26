@@ -1,6 +1,7 @@
 """Dialog for logging an interaction."""
 
 from datetime import date
+from typing import TypedDict
 
 from PySide6.QtWidgets import (
     QComboBox,
@@ -16,6 +17,15 @@ from PySide6.QtWidgets import (
 from keep_in_touch.domain.date_utils import parse_date
 
 
+class InteractionDialogValues(TypedDict):
+    """Validated interaction values collected from the dialog."""
+
+    interaction_date: date
+    interaction_type: str
+    summary: str
+    follow_up_notes: str
+
+
 class LogInteractionDialog(QDialog):
     """Collect interaction details from the user.
 
@@ -26,6 +36,8 @@ class LogInteractionDialog(QDialog):
     """
 
     def __init__(self) -> None:
+        """Create an empty interaction form with today's date prefilled."""
+
         super().__init__()
         self.setWindowTitle("Log Interaction")
 
@@ -61,7 +73,7 @@ class LogInteractionDialog(QDialog):
             return
         super().accept()
 
-    def values(self) -> dict[str, object]:
+    def values(self) -> InteractionDialogValues:
         """Return dialog values."""
 
         interaction_date = parse_date(self.date_edit.text())

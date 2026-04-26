@@ -25,7 +25,8 @@ from PySide6.QtWidgets import (
 
 from keep_in_touch.app.app_config import AppConfig
 from keep_in_touch.domain.date_utils import today_local
-from keep_in_touch.domain.models import Person
+from keep_in_touch.domain.display import date_text, display_name, tags_text
+from keep_in_touch.domain.models import Interaction, Person
 from keep_in_touch.services.import_export_service import ImportExportService
 from keep_in_touch.services.interaction_service import InteractionService
 from keep_in_touch.services.people_service import PeopleService
@@ -36,6 +37,12 @@ from keep_in_touch.ui.dialogs.edit_person_dialog import EditPersonDialog
 from keep_in_touch.ui.dialogs.log_interaction_dialog import LogInteractionDialog
 from keep_in_touch.ui.people_table import PeopleTable
 from keep_in_touch.ui.person_detail_panel import PersonDetailPanel
+
+NO_DATA_FOLDER_MESSAGE = (
+    "No data folder selected.\n\n"
+    "Use File > Set Data Folder... to choose where Keep in Touch should store "
+    "your local data files."
+)
 
 
 class MainWindow(QMainWindow):
@@ -51,6 +58,8 @@ class MainWindow(QMainWindow):
     """
 
     def __init__(self, config: AppConfig) -> None:
+        """Create the main window for a runtime app configuration."""
+
         super().__init__()
         self.config = config
         self.setWindowTitle("Keep in Touch")
@@ -301,20 +310,14 @@ class MainWindow(QMainWindow):
         if not self._has_data_folder():
             self.people = []
             self.people_table.set_people([], today=today_local())
-            self.detail_panel.setPlainText(
-                "No data folder selected.\n\n"
-                "Use File > Set Data Folder... to choose where Keep in Touch "
-                "should store your local data files."
-            )
+            self.detail_panel.setPlainText(NO_DATA_FOLDER_MESSAGE)
             self.data_folder_label.setText("No data folder selected")
             self._update_action_state()
             return
 
-        assert self.people_service is not None
-
         selected_id = self.people_table.selected_person_id()
         today = today_local()
-        self.people = self.people_service.list_people(today=today)
+        self.people = self._people_service().list_people(today=today)
         self.people_table.set_people(self.people, today=today)
 
         self.data_folder_label.setText(f"Data folder: {self.config.require_data_dir()}")
@@ -334,11 +337,12 @@ class MainWindow(QMainWindow):
         if not self._require_data_folder():
             return
 
-        assert self.people_service is not None
-
         dialog = EditPersonDialog()
         if dialog.exec():
-            self.people_service.create_person(dialog.to_person(), today=today_local())
+            self._people_service().create_person(
+                dialog.to_person(),
+                today=today_local(),
+            )
             self.refresh_people()
 
     def edit_selected_person(self) -> None:
@@ -360,8 +364,6 @@ class MainWindow(QMainWindow):
         if not self._require_data_folder():
             return
 
-        assert self.interaction_service is not None
-
         person = self._selected_person()
         if person is None:
             QMessageBox.information(self, "No selection", "Select a person first.")
@@ -370,12 +372,12 @@ class MainWindow(QMainWindow):
         dialog = LogInteractionDialog()
         if dialog.exec():
             values = dialog.values()
-            self.interaction_service.log_interaction(
+            self._interaction_service().log_interaction(
                 person_id=person.id,
-                interaction_date=values["interaction_date"],  # type: ignore[arg-type]
-                interaction_type=str(values["interaction_type"]),
-                summary=str(values["summary"]),
-                follow_up_notes=str(values["follow_up_notes"]),
+                interaction_date=values["interaction_date"],
+                interaction_type=values["interaction_type"],
+                summary=values["summary"],
+                follow_up_notes=values["follow_up_notes"],
                 today=today_local(),
             )
             self.refresh_people()
@@ -387,15 +389,13 @@ class MainWindow(QMainWindow):
         if not self._require_data_folder():
             return
 
-        assert self.interaction_service is not None
-
         person = self._selected_person()
         if person is None:
             QMessageBox.information(self, "No selection", "Select a person first.")
             return
 
         today = today_local()
-        self.interaction_service.log_interaction(
+        self._interaction_service().log_interaction(
             person_id=person.id,
             interaction_date=today,
             interaction_type="contact",
@@ -405,16 +405,16 @@ class MainWindow(QMainWindow):
         )
         self.refresh_people()
         self._show_person(person.id)
-        self.statusBar().showMessage(f"Logged contact with {person.full_name}.", 3000)
+        self.statusBar().showMessage(
+            f"Logged contact with {display_name(person)}.",
+            3000,
+        )
 
     def delete_selected_person(self) -> None:
         """Delete the selected person and their interaction history."""
 
         if not self._require_data_folder():
             return
-
-        assert self.people_service is not None
-        assert self.interaction_service is not None
 
         person = self._selected_person()
         if person is None:
@@ -425,7 +425,8 @@ class MainWindow(QMainWindow):
             self,
             "Delete person",
             (
-                f"Delete {person.full_name} and all interactions associated with this "
+                f"Delete {display_name(person)} and all interactions associated "
+                "with this "
                 "person? This cannot be undone."
             ),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
@@ -434,10 +435,10 @@ class MainWindow(QMainWindow):
         if response != QMessageBox.StandardButton.Yes:
             return
 
-        self.interaction_service.delete_interactions_for_person(person.id)
-        self.people_service.delete_person(person.id, today=today_local())
+        self._interaction_service().delete_interactions_for_person(person.id)
+        self._people_service().delete_person(person.id, today=today_local())
         self.refresh_people()
-        self.statusBar().showMessage(f"Deleted {person.full_name}.", 3000)
+        self.statusBar().showMessage(f"Deleted {display_name(person)}.", 3000)
 
     def copy_selected_person_name(self) -> None:
         """Copy the selected person's full name to the clipboard."""
@@ -446,8 +447,9 @@ class MainWindow(QMainWindow):
         if person is None:
             return
 
-        QGuiApplication.clipboard().setText(person.full_name)
-        self.statusBar().showMessage(f"Copied name for {person.full_name}.", 3000)
+        name = display_name(person)
+        QGuiApplication.clipboard().setText(name)
+        self.statusBar().showMessage(f"Copied name for {name}.", 3000)
 
     def copy_selected_person_summary(self) -> None:
         """Copy a plain-text summary of the selected person to the clipboard."""
@@ -458,7 +460,10 @@ class MainWindow(QMainWindow):
 
         summary = self._person_summary(person)
         QGuiApplication.clipboard().setText(summary)
-        self.statusBar().showMessage(f"Copied summary for {person.full_name}.", 3000)
+        self.statusBar().showMessage(
+            f"Copied summary for {display_name(person)}.",
+            3000,
+        )
 
     def clear_selection(self) -> None:
         """Clear the selected person."""
@@ -473,13 +478,11 @@ class MainWindow(QMainWindow):
         if not self._require_data_folder():
             return
 
-        assert self.import_export_service is not None
-
         path = self._save_path("people.csv")
         if path is None:
             return
 
-        self.import_export_service.export_people_csv(path, today=today_local())
+        self._import_export_service().export_people_csv(path, today=today_local())
         QMessageBox.information(self, "Export complete", f"Saved {path}")
 
     def export_interactions_csv(self) -> None:
@@ -488,13 +491,11 @@ class MainWindow(QMainWindow):
         if not self._require_data_folder():
             return
 
-        assert self.import_export_service is not None
-
         path = self._save_path("interactions.csv")
         if path is None:
             return
 
-        self.import_export_service.export_interactions_csv(path)
+        self._import_export_service().export_interactions_csv(path)
         QMessageBox.information(self, "Export complete", f"Saved {path}")
 
     def import_people_csv(self) -> None:
@@ -502,8 +503,6 @@ class MainWindow(QMainWindow):
 
         if not self._require_data_folder():
             return
-
-        assert self.import_export_service is not None
 
         filename, _ = QFileDialog.getOpenFileName(
             self,
@@ -515,7 +514,7 @@ class MainWindow(QMainWindow):
         if not filename:
             return
 
-        imported = self.import_export_service.import_people_csv(
+        imported = self._import_export_service().import_people_csv(
             Path(filename), today=today_local()
         )
         self.refresh_people()
@@ -555,30 +554,28 @@ class MainWindow(QMainWindow):
         """Return the selected person, if any."""
 
         selected_id = self.people_table.selected_person_id()
-        if selected_id is None:
-            return None
+        return self._person_by_id(selected_id) if selected_id else None
 
-        for person in self.people:
-            if person.id == selected_id:
-                return person
+    def _person_by_id(self, person_id: str) -> Person | None:
+        """Return a person from the current in-memory list by ID."""
 
-        return None
+        return next((person for person in self.people if person.id == person_id), None)
 
     def _show_person(self, person_id: str) -> None:
         """Display one person's details."""
 
-        if self.interaction_service is None:
+        if not self._has_data_folder():
             self.detail_panel.clear_person()
             self._update_action_state()
             return
 
-        person = next((item for item in self.people if item.id == person_id), None)
+        person = self._person_by_id(person_id)
         if person is None:
             self.detail_panel.clear_person()
             self._update_action_state()
             return
 
-        interactions = self.interaction_service.list_for_person(person_id)
+        interactions = self._interaction_service().list_for_person(person_id)
         self.detail_panel.set_person(person, interactions)
         self._update_action_state()
 
@@ -588,11 +585,7 @@ class MainWindow(QMainWindow):
         if self._has_data_folder():
             self.detail_panel.clear_person()
         else:
-            self.detail_panel.setPlainText(
-                "No data folder selected.\n\n"
-                "Use File > Set Data Folder... to choose where Keep in Touch "
-                "should store your local data files."
-            )
+            self.detail_panel.setPlainText(NO_DATA_FOLDER_MESSAGE)
         self._update_action_state()
 
     def _edit_person_by_id(self, person_id: str) -> None:
@@ -601,7 +594,7 @@ class MainWindow(QMainWindow):
         This is used for double-click editing from the people table.
         """
 
-        person = next((item for item in self.people if item.id == person_id), None)
+        person = self._person_by_id(person_id)
         if person is None:
             return
 
@@ -610,12 +603,15 @@ class MainWindow(QMainWindow):
     def _edit_person(self, person: Person) -> None:
         """Open the edit dialog for a specific person."""
 
-        if self.people_service is None:
+        if not self._has_data_folder():
             return
 
         dialog = EditPersonDialog(person)
         if dialog.exec():
-            self.people_service.update_person(dialog.to_person(), today=today_local())
+            self._people_service().update_person(
+                dialog.to_person(),
+                today=today_local(),
+            )
             self.refresh_people()
 
     def _show_people_context_menu(self, position: QPoint) -> None:
@@ -656,22 +652,19 @@ class MainWindow(QMainWindow):
     def _person_summary(self, person: Person) -> str:
         """Return a copy-friendly plain-text summary for one person."""
 
-        interactions = []
-        if self.interaction_service is not None:
-            interactions = self.interaction_service.list_for_person(person.id)
-
+        interactions = self._interactions_for_summary(person)
         last_interaction = interactions[0] if interactions else None
 
         lines = [
-            f"Name: {person.full_name}",
+            f"Name: {display_name(person)}",
             f"First name: {person.first_name or '-'}",
             f"Last name: {person.last_name or '-'}",
             f"Nickname: {person.nickname or '-'}",
             f"Relationship: {person.relationship or '-'}",
             f"Preferred method: {person.preferred_contact_method or '-'}",
-            f"Last contacted: {person.last_contacted_at.isoformat() if person.last_contacted_at else '-'}",
-            f"Next contact: {person.next_contact_at.isoformat() if person.next_contact_at else 'Not set'}",
-            f"Tags: {', '.join(person.tags) if person.tags else '-'}",
+            f"Last contacted: {date_text(person.last_contacted_at)}",
+            f"Next contact: {date_text(person.next_contact_at, 'Not set')}",
+            f"Tags: {tags_text(person)}",
             "",
             "Bio:",
             person.bio or "-",
@@ -681,17 +674,16 @@ class MainWindow(QMainWindow):
         ]
 
         if last_interaction is not None:
-            lines.extend(
-                [
-                    "",
-                    "Most recent interaction:",
-                    f"{last_interaction.date.isoformat()} — {last_interaction.interaction_type or 'interaction'}",
-                    f"Summary: {last_interaction.summary or '-'}",
-                    f"Follow-up: {last_interaction.follow_up_notes or '-'}",
-                ]
-            )
+            lines.extend(_interaction_summary_lines(last_interaction))
 
         return "\n".join(lines)
+
+    def _interactions_for_summary(self, person: Person) -> list[Interaction]:
+        """Return interactions for summary text when the service is available."""
+
+        if self.interaction_service is None:
+            return []
+        return self.interaction_service.list_for_person(person.id)
 
     def _select_person_by_id(self, person_id: str) -> None:
         """Restore a table selection by person ID after a refresh."""
@@ -711,6 +703,31 @@ class MainWindow(QMainWindow):
             and self.interaction_service is not None
             and self.import_export_service is not None
         )
+
+    def _people_service(self) -> PeopleService:
+        """Return the configured people service or raise a clear error."""
+
+        if self.people_service is None:
+            raise RuntimeError("People service is unavailable without a data folder.")
+        return self.people_service
+
+    def _interaction_service(self) -> InteractionService:
+        """Return the configured interaction service or raise a clear error."""
+
+        if self.interaction_service is None:
+            raise RuntimeError(
+                "Interaction service is unavailable without a data folder."
+            )
+        return self.interaction_service
+
+    def _import_export_service(self) -> ImportExportService:
+        """Return the configured import/export service or raise a clear error."""
+
+        if self.import_export_service is None:
+            raise RuntimeError(
+                "Import/export service is unavailable without a data folder."
+            )
+        return self.import_export_service
 
     def _require_data_folder(self) -> bool:
         """Show a message if no data folder is selected."""
@@ -732,23 +749,42 @@ class MainWindow(QMainWindow):
         """Enable or disable actions based on app state."""
 
         has_data_folder = self._has_data_folder()
-        has_selection = self._selected_person() is not None if has_data_folder else False
+        has_selection = has_data_folder and self._selected_person() is not None
 
-        self.import_people_action.setEnabled(has_data_folder)
-        self.export_people_action.setEnabled(has_data_folder)
-        self.export_interactions_action.setEnabled(has_data_folder)
-        self.refresh_action.setEnabled(has_data_folder)
-        self.add_person_action.setEnabled(has_data_folder)
+        for action in (
+            self.import_people_action,
+            self.export_people_action,
+            self.export_interactions_action,
+            self.refresh_action,
+            self.add_person_action,
+        ):
+            action.setEnabled(has_data_folder)
 
-        self.edit_selected_action.setEnabled(has_selection)
-        self.log_interaction_action.setEnabled(has_selection)
-        self.quick_contact_today_action.setEnabled(has_selection)
-        self.delete_selected_action.setEnabled(has_selection)
-        self.copy_name_action.setEnabled(has_selection)
-        self.copy_summary_action.setEnabled(has_selection)
-        self.clear_selection_action.setEnabled(has_selection)
+        for action in (
+            self.edit_selected_action,
+            self.log_interaction_action,
+            self.quick_contact_today_action,
+            self.delete_selected_action,
+            self.copy_name_action,
+            self.copy_summary_action,
+            self.clear_selection_action,
+        ):
+            action.setEnabled(has_selection)
 
         self.add_person_button.setEnabled(has_data_folder)
         self.edit_selected_button.setEnabled(has_selection)
         self.log_interaction_button.setEnabled(has_selection)
         self.delete_selected_button.setEnabled(has_selection)
+
+
+def _interaction_summary_lines(interaction: Interaction) -> list[str]:
+    """Return copy-friendly lines for the most recent interaction."""
+
+    interaction_type = interaction.interaction_type or "interaction"
+    return [
+        "",
+        "Most recent interaction:",
+        f"{interaction.date.isoformat()} - {interaction_type}",
+        f"Summary: {interaction.summary or '-'}",
+        f"Follow-up: {interaction.follow_up_notes or '-'}",
+    ]

@@ -22,6 +22,8 @@ class PeopleService:
     """
 
     def __init__(self, people_store: JsonlStore) -> None:
+        """Create the service from a people JSONL store."""
+
         self.people_store = people_store
 
     def list_people(self, today: date) -> list[Person]:

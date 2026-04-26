@@ -8,7 +8,6 @@ from keep_in_touch.domain.models import Interaction
 from keep_in_touch.domain.serialization import (
     interaction_from_record,
     interaction_to_record,
-    person_to_record,
 )
 from keep_in_touch.services.ids import new_interaction_id
 from keep_in_touch.services.people_service import PeopleService
@@ -37,6 +36,8 @@ class InteractionService:
         interactions_store: JsonlStore,
         people_service: PeopleService,
     ) -> None:
+        """Create the service from interaction storage and people workflows."""
+
         self.interactions_store = interactions_store
         self.people_service = people_service
 
@@ -53,7 +54,9 @@ class InteractionService:
     def list_for_person(self, person_id: str) -> list[Interaction]:
         """Return interactions for one person sorted newest first."""
 
-        return [item for item in self.list_interactions() if item.person_id == person_id]
+        return [
+            item for item in self.list_interactions() if item.person_id == person_id
+        ]
 
     def log_interaction(
         self,
@@ -93,25 +96,24 @@ class InteractionService:
             [interaction_to_record(item) for item in interactions]
         )
 
-        if person.last_contacted_at is None or interaction_date >= person.last_contacted_at:
+        is_new_latest_contact = (
+            person.last_contacted_at is None
+            or interaction_date >= person.last_contacted_at
+        )
+        if is_new_latest_contact:
             person.last_contacted_at = interaction_date
         person.updated_at = now
         recalculate_person(person, today)
 
-        people = self.people_service.list_people(today=today)
-        for index, existing in enumerate(people):
-            if existing.id == person.id:
-                people[index] = person
-                break
-        self.people_service.people_store.write_all(
-            [person_to_record(item) for item in people]
-        )
+        self.people_service.update_person(person, today=today)
         return interaction
 
     def delete_interactions_for_person(self, person_id: str) -> None:
         """Remove all interactions associated with one person."""
 
-        remaining = [item for item in self.list_interactions() if item.person_id != person_id]
+        remaining = [
+            item for item in self.list_interactions() if item.person_id != person_id
+        ]
         self.interactions_store.write_all(
             [interaction_to_record(item) for item in remaining]
         )
