@@ -29,6 +29,8 @@ from keep_in_touch.domain.models import Person
 from keep_in_touch.services.import_export_service import ImportExportService
 from keep_in_touch.services.interaction_service import InteractionService
 from keep_in_touch.services.people_service import PeopleService
+from keep_in_touch.storage.app_paths import ensure_data_layout
+from keep_in_touch.storage.app_settings import save_remembered_data_dir
 from keep_in_touch.storage.jsonl_store import JsonlStore
 from keep_in_touch.ui.dialogs.edit_person_dialog import EditPersonDialog
 from keep_in_touch.ui.dialogs.log_interaction_dialog import LogInteractionDialog
@@ -39,19 +41,12 @@ from keep_in_touch.ui.person_detail_panel import PersonDetailPanel
 class MainWindow(QMainWindow):
     """Main application window.
 
-    Responsibilities:
-        - Arrange major UI panels.
-        - Create standard application menus.
-        - Connect UI actions to service calls.
-        - Refresh visible data after changes.
-
-    This class should not:
-        - Parse CSV files directly.
-        - Calculate urgency scores.
-        - Read or write JSONL records directly.
+    The window can open without a configured data folder. In that state, data
+    actions are disabled until the user chooses or creates a folder from the File
+    menu.
 
     Example:
-        window = MainWindow(config)
+        window = MainWindow(AppConfig())
         window.show()
     """
 
@@ -61,17 +56,14 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Keep in Touch")
         self.setMinimumSize(980, 640)
 
-        self.people_service = PeopleService(JsonlStore(config.people_path))
-        self.interaction_service = InteractionService(
-            JsonlStore(config.interactions_path), self.people_service
-        )
-        self.import_export_service = ImportExportService(
-            self.people_service, self.interaction_service
-        )
+        self.people_service: PeopleService | None = None
+        self.interaction_service: InteractionService | None = None
+        self.import_export_service: ImportExportService | None = None
 
         self.people_table = PeopleTable()
         self.detail_panel = PersonDetailPanel()
         self.people: list[Person] = []
+        self.data_folder_label = QLabel()
 
         self._create_actions()
         self._create_menu_bar()
@@ -79,10 +71,14 @@ class MainWindow(QMainWindow):
         self._create_status_bar()
         self._connect_signals()
 
+        self._configure_services_from_config()
         self.refresh_people()
 
     def _create_actions(self) -> None:
         """Create reusable menu and context-menu actions."""
+
+        self.set_data_folder_action = QAction("Set Data Folder...", self)
+        self.set_data_folder_action.triggered.connect(self.set_data_folder)
 
         self.add_person_action = QAction("Add Person", self)
         self.add_person_action.setShortcut(QKeySequence.StandardKey.New)
@@ -138,6 +134,8 @@ class MainWindow(QMainWindow):
         """Create a standard File/Edit/View/Help menu bar."""
 
         file_menu = self.menuBar().addMenu("&File")
+        file_menu.addAction(self.set_data_folder_action)
+        file_menu.addSeparator()
         file_menu.addAction(self.import_people_action)
         file_menu.addSeparator()
         file_menu.addAction(self.export_people_action)
@@ -197,7 +195,11 @@ class MainWindow(QMainWindow):
         return panel
 
     def _create_action_buttons(self) -> QGroupBox:
-        """Create record-specific action buttons."""
+        """Create record-specific action buttons.
+
+        Rare global actions, such as changing the data folder, live in the File
+        menu instead of this button area.
+        """
 
         group_box = QGroupBox("Actions")
         layout = QHBoxLayout(group_box)
@@ -224,9 +226,7 @@ class MainWindow(QMainWindow):
         """Create a small status bar for context, not commands."""
 
         status_bar = QStatusBar()
-        status_bar.addPermanentWidget(
-            QLabel(f"Data folder: {self.config.data_dir}"), stretch=1
-        )
+        status_bar.addPermanentWidget(self.data_folder_label, stretch=1)
         self.setStatusBar(status_bar)
 
     def _connect_signals(self) -> None:
@@ -240,13 +240,70 @@ class MainWindow(QMainWindow):
             self._show_people_context_menu
         )
 
+    def _configure_services_from_config(self) -> None:
+        """Create services when a data folder is configured."""
+
+        if not self.config.has_data_dir:
+            self.people_service = None
+            self.interaction_service = None
+            self.import_export_service = None
+            return
+
+        self.people_service = PeopleService(JsonlStore(self.config.people_path))
+        self.interaction_service = InteractionService(
+            JsonlStore(self.config.interactions_path), self.people_service
+        )
+        self.import_export_service = ImportExportService(
+            self.people_service, self.interaction_service
+        )
+
+    def set_data_folder(self) -> None:
+        """Let the user choose or create the app data folder."""
+
+        selected_directory = QFileDialog.getExistingDirectory(
+            self,
+            "Choose or Create Keep in Touch Data Folder",
+            str(Path.home()),
+            QFileDialog.Option.ShowDirsOnly
+            | QFileDialog.Option.DontUseNativeDialog,
+        )
+
+        if not selected_directory:
+            return
+
+        data_dir = Path(selected_directory).expanduser()
+        ensure_data_layout(data_dir)
+        save_remembered_data_dir(data_dir)
+
+        self.config = AppConfig(data_dir=data_dir)
+        self._configure_services_from_config()
+        self.refresh_people()
+
+        self.statusBar().showMessage(f"Using data folder: {data_dir}", 5000)
+
     def refresh_people(self) -> None:
         """Reload people and refresh the table."""
+
+        if not self._has_data_folder():
+            self.people = []
+            self.people_table.set_people([], today=today_local())
+            self.detail_panel.setPlainText(
+                "No data folder selected.\n\n"
+                "Use File > Set Data Folder... to choose where Keep in Touch "
+                "should store your local data files."
+            )
+            self.data_folder_label.setText("No data folder selected")
+            self._update_action_state()
+            return
+
+        assert self.people_service is not None
 
         selected_id = self.people_table.selected_person_id()
         today = today_local()
         self.people = self.people_service.list_people(today=today)
         self.people_table.set_people(self.people, today=today)
+
+        self.data_folder_label.setText(f"Data folder: {self.config.require_data_dir()}")
 
         if selected_id and any(person.id == selected_id for person in self.people):
             self._select_person_by_id(selected_id)
@@ -260,6 +317,11 @@ class MainWindow(QMainWindow):
     def add_person(self) -> None:
         """Open the add-person dialog."""
 
+        if not self._require_data_folder():
+            return
+
+        assert self.people_service is not None
+
         dialog = EditPersonDialog()
         if dialog.exec():
             self.people_service.create_person(dialog.to_person(), today=today_local())
@@ -268,14 +330,23 @@ class MainWindow(QMainWindow):
     def edit_selected_person(self) -> None:
         """Open the edit dialog for the selected person."""
 
+        if not self._require_data_folder():
+            return
+
         person = self._selected_person()
         if person is None:
             QMessageBox.information(self, "No selection", "Select a person first.")
             return
+
         self._edit_person(person)
 
     def log_interaction(self) -> None:
         """Open the log-interaction dialog for the selected person."""
+
+        if not self._require_data_folder():
+            return
+
+        assert self.interaction_service is not None
 
         person = self._selected_person()
         if person is None:
@@ -299,6 +370,11 @@ class MainWindow(QMainWindow):
     def quick_log_contact_today(self) -> None:
         """Log a simple contact for the selected person using today's date."""
 
+        if not self._require_data_folder():
+            return
+
+        assert self.interaction_service is not None
+
         person = self._selected_person()
         if person is None:
             QMessageBox.information(self, "No selection", "Select a person first.")
@@ -319,6 +395,12 @@ class MainWindow(QMainWindow):
 
     def delete_selected_person(self) -> None:
         """Delete the selected person and their interaction history."""
+
+        if not self._require_data_folder():
+            return
+
+        assert self.people_service is not None
+        assert self.interaction_service is not None
 
         person = self._selected_person()
         if person is None:
@@ -374,29 +456,47 @@ class MainWindow(QMainWindow):
     def export_people_csv(self) -> None:
         """Export people CSV to a chosen file."""
 
+        if not self._require_data_folder():
+            return
+
+        assert self.import_export_service is not None
+
         path = self._save_path("people.csv")
         if path is None:
             return
+
         self.import_export_service.export_people_csv(path, today=today_local())
         QMessageBox.information(self, "Export complete", f"Saved {path}")
 
     def export_interactions_csv(self) -> None:
         """Export interactions CSV to a chosen file."""
 
+        if not self._require_data_folder():
+            return
+
+        assert self.import_export_service is not None
+
         path = self._save_path("interactions.csv")
         if path is None:
             return
+
         self.import_export_service.export_interactions_csv(path)
         QMessageBox.information(self, "Export complete", f"Saved {path}")
 
     def import_people_csv(self) -> None:
         """Import people from CSV."""
 
+        if not self._require_data_folder():
+            return
+
+        assert self.import_export_service is not None
+
         filename, _ = QFileDialog.getOpenFileName(
             self,
             "Import People CSV",
             str(self.config.exports_dir),
             "CSV Files (*.csv);;All Files (*)",
+            options=QFileDialog.Option.DontUseNativeDialog,
         )
         if not filename:
             return
@@ -418,8 +518,9 @@ class MainWindow(QMainWindow):
             self,
             "About Keep in Touch",
             (
-                "Keep in Touch is a local-first personal relationship "
-                "tracking application. Data is stored as portable text files."
+                "Keep in Touch is a local-first personal relationship tracking "
+                "application. Data is stored as portable text files in a folder "
+                "you choose."
             ),
         )
 
@@ -432,6 +533,7 @@ class MainWindow(QMainWindow):
             "Save CSV",
             str(default_path),
             "CSV Files (*.csv);;All Files (*)",
+            options=QFileDialog.Option.DontUseNativeDialog,
         )
         return Path(selected) if selected else None
 
@@ -451,6 +553,11 @@ class MainWindow(QMainWindow):
     def _show_person(self, person_id: str) -> None:
         """Display one person's details."""
 
+        if self.interaction_service is None:
+            self.detail_panel.clear_person()
+            self._update_action_state()
+            return
+
         person = next((item for item in self.people if item.id == person_id), None)
         if person is None:
             self.detail_panel.clear_person()
@@ -464,7 +571,14 @@ class MainWindow(QMainWindow):
     def _clear_selected_person(self) -> None:
         """Clear the detail panel when no person is selected."""
 
-        self.detail_panel.clear_person()
+        if self._has_data_folder():
+            self.detail_panel.clear_person()
+        else:
+            self.detail_panel.setPlainText(
+                "No data folder selected.\n\n"
+                "Use File > Set Data Folder... to choose where Keep in Touch "
+                "should store your local data files."
+            )
         self._update_action_state()
 
     def _edit_person_by_id(self, person_id: str) -> None:
@@ -482,6 +596,9 @@ class MainWindow(QMainWindow):
     def _edit_person(self, person: Person) -> None:
         """Open the edit dialog for a specific person."""
 
+        if self.people_service is None:
+            return
+
         dialog = EditPersonDialog(person)
         if dialog.exec():
             self.people_service.update_person(dialog.to_person(), today=today_local())
@@ -489,6 +606,13 @@ class MainWindow(QMainWindow):
 
     def _show_people_context_menu(self, position: QPoint) -> None:
         """Show a right-click menu for the people table."""
+
+        if not self._has_data_folder():
+            menu = QMenu(self)
+            menu.addAction(self.set_data_folder_action)
+            global_position = self.people_table.viewport().mapToGlobal(position)
+            menu.exec(global_position)
+            return
 
         self.people_table.select_person_at_position(position)
         has_selection = self._selected_person() is not None
@@ -518,7 +642,10 @@ class MainWindow(QMainWindow):
     def _person_summary(self, person: Person) -> str:
         """Return a copy-friendly plain-text summary for one person."""
 
-        interactions = self.interaction_service.list_for_person(person.id)
+        interactions = []
+        if self.interaction_service is not None:
+            interactions = self.interaction_service.list_for_person(person.id)
+
         last_interaction = interactions[0] if interactions else None
 
         lines = [
@@ -561,10 +688,43 @@ class MainWindow(QMainWindow):
                 self.people_table.selectRow(row)
                 return
 
-    def _update_action_state(self) -> None:
-        """Enable or disable selected-person actions."""
+    def _has_data_folder(self) -> bool:
+        """Return whether the app currently has a selected data folder."""
 
-        has_selection = self._selected_person() is not None
+        return (
+            self.config.has_data_dir
+            and self.people_service is not None
+            and self.interaction_service is not None
+            and self.import_export_service is not None
+        )
+
+    def _require_data_folder(self) -> bool:
+        """Show a message if no data folder is selected."""
+
+        if self._has_data_folder():
+            return True
+
+        QMessageBox.information(
+            self,
+            "No data folder selected",
+            (
+                "Choose a data folder before adding people or importing data.\n\n"
+                "Use File > Set Data Folder... to choose or create one."
+            ),
+        )
+        return False
+
+    def _update_action_state(self) -> None:
+        """Enable or disable actions based on app state."""
+
+        has_data_folder = self._has_data_folder()
+        has_selection = self._selected_person() is not None if has_data_folder else False
+
+        self.import_people_action.setEnabled(has_data_folder)
+        self.export_people_action.setEnabled(has_data_folder)
+        self.export_interactions_action.setEnabled(has_data_folder)
+        self.refresh_action.setEnabled(has_data_folder)
+        self.add_person_action.setEnabled(has_data_folder)
 
         self.edit_selected_action.setEnabled(has_selection)
         self.log_interaction_action.setEnabled(has_selection)
@@ -574,6 +734,7 @@ class MainWindow(QMainWindow):
         self.copy_summary_action.setEnabled(has_selection)
         self.clear_selection_action.setEnabled(has_selection)
 
+        self.add_person_button.setEnabled(has_data_folder)
         self.edit_selected_button.setEnabled(has_selection)
         self.log_interaction_button.setEnabled(has_selection)
         self.delete_selected_button.setEnabled(has_selection)

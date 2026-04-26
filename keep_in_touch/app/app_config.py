@@ -1,49 +1,73 @@
-"""Application configuration."""
+"""Application configuration.
+
+The app can start without a data folder. A data folder is only required once the
+user chooses one from the UI.
+"""
 
 from dataclasses import dataclass
 from pathlib import Path
 
 
-@dataclass(frozen=True)
+@dataclass(slots=True)
 class AppConfig:
-    """Runtime configuration for the application.
+    """Runtime app configuration.
 
     Args:
-        data_dir: Directory containing app data files.
+        data_dir: User-selected folder containing Keep in Touch data files.
 
     Example:
-        config = AppConfig(data_dir=Path("~/Documents/KeepInTouch/data").expanduser())
+        config = AppConfig()
+        assert not config.has_data_dir
+
+        config = AppConfig(data_dir=Path("/tmp/keep-in-touch"))
         assert config.people_path.name == "people.jsonl"
     """
 
-    data_dir: Path
+    data_dir: Path | None = None
+
+    @property
+    def has_data_dir(self) -> bool:
+        """Return whether a usable data folder is configured."""
+
+        return self.data_dir is not None
 
     @property
     def people_path(self) -> Path:
-        """Path to the people JSONL file."""
+        """Return the people JSONL path."""
 
-        return self.data_dir / "people.jsonl"
+        return self.require_data_dir() / "people.jsonl"
 
     @property
     def interactions_path(self) -> Path:
-        """Path to the interactions JSONL file."""
+        """Return the interactions JSONL path."""
 
-        return self.data_dir / "interactions.jsonl"
+        return self.require_data_dir() / "interactions.jsonl"
 
     @property
     def settings_path(self) -> Path:
-        """Path to the settings JSON file."""
+        """Return the data-folder-local settings path."""
 
-        return self.data_dir / "settings.json"
+        return self.require_data_dir() / "settings.json"
 
     @property
     def exports_dir(self) -> Path:
-        """Path to exported CSV/JSONL files."""
+        """Return the exports directory path."""
 
-        return self.data_dir / "exports"
+        return self.require_data_dir() / "exports"
 
     @property
     def backups_dir(self) -> Path:
-        """Path to backups."""
+        """Return the backups directory path."""
 
-        return self.data_dir / "backups"
+        return self.require_data_dir() / "backups"
+
+    def require_data_dir(self) -> Path:
+        """Return the configured data folder or raise a clear error.
+
+        Raises:
+            RuntimeError: If no data folder has been selected.
+        """
+
+        if self.data_dir is None:
+            raise RuntimeError("No Keep in Touch data folder has been selected.")
+        return self.data_dir

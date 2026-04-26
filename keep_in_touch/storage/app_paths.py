@@ -3,25 +3,17 @@
 from pathlib import Path
 
 
-def default_data_dir() -> Path:
-    """Return the default data directory.
-
-    Example:
-        path = default_data_dir()
-        assert path.name == "data"
-    """
-
-    return Path.home() / "Documents" / "KeepInTouch" / "data"
-
-
 def ensure_data_layout(data_dir: Path) -> None:
-    """Create the data directory and empty files if needed.
+    """Create the app data layout inside a user-selected folder.
+
+    This function should only be called after the user explicitly chooses a data
+    folder. It creates the files and subfolders Keep in Touch needs.
 
     Args:
-        data_dir: Directory that contains the app's data files.
+        data_dir: User-selected directory that contains the app's data files.
 
     Example:
-        ensure_data_layout(Path("/tmp/keep-in-touch-data"))
+        ensure_data_layout(Path("/tmp/my-keep-in-touch-data"))
     """
 
     data_dir.mkdir(parents=True, exist_ok=True)
