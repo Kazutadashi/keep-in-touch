@@ -70,6 +70,7 @@ def print_report(people: list[dict[str, Any]], today: date) -> None:
     print_counter("Most common tags", tag_counts(people), limit=10)
     print_counter("Social platform coverage", social_platform_counts(people))
     print_contact_field_coverage(people)
+    print_upcoming_birthdays(people, today, limit=5)
     print_contact_age_summary(people, today)
     print_stale_contacts(people, today, limit=5)
 
@@ -117,6 +118,31 @@ def print_contact_field_coverage(people: list[dict[str, Any]]) -> None:
     print("Direct contact coverage:")
     print(f"  email: {email_count}/{total}")
     print(f"  phone: {phone_count}/{total}")
+    print()
+
+
+def print_upcoming_birthdays(
+    people: list[dict[str, Any]],
+    today: date,
+    limit: int,
+) -> None:
+    """Print the next upcoming birthdays."""
+
+    upcoming = [
+        (days_until_birthday(record, today), full_name(record))
+        for record in people
+        if days_until_birthday(record, today) is not None
+    ]
+    upcoming.sort()
+
+    print(f"Next {limit} birthdays:")
+    if not upcoming:
+        print("  -")
+        print()
+        return
+    for days, name in upcoming[:limit]:
+        label = "today" if days == 0 else f"in {days} days"
+        print(f"  {name}: {label}")
     print()
 
 
@@ -183,6 +209,28 @@ def days_since_contact(record: dict[str, Any], today: date) -> int | None:
         return None
     last_contacted = date.fromisoformat(raw_date)
     return max(0, (today - last_contacted).days)
+
+
+def days_until_birthday(record: dict[str, Any], today: date) -> int | None:
+    """Return days until the next birthday for a raw person record."""
+
+    raw_birthday = record.get("birthday")
+    if not isinstance(raw_birthday, str) or not raw_birthday:
+        return None
+    birthday = date.fromisoformat(raw_birthday)
+    next_birthday = birthday_for_year(birthday, today.year)
+    if next_birthday < today:
+        next_birthday = birthday_for_year(birthday, today.year + 1)
+    return (next_birthday - today).days
+
+
+def birthday_for_year(birthday: date, year: int) -> date:
+    """Return this year's birthday, moving Feb 29 to Mar 1 when needed."""
+
+    try:
+        return date(year, birthday.month, birthday.day)
+    except ValueError:
+        return date(year, 3, 1)
 
 
 def full_name(record: dict[str, Any]) -> str:

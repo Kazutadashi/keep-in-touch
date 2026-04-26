@@ -1,5 +1,6 @@
 """Display-oriented helpers for domain models."""
 
+from calendar import month_abbr
 from datetime import date
 
 from keep_in_touch.domain.formulas import days_since_contact
@@ -60,6 +61,36 @@ def date_text(value: date | None, fallback: str = "-") -> str:
     return value.isoformat() if value else fallback
 
 
+def days_until_birthday(person: Person, today: date) -> int | None:
+    """Return days until the person's next birthday, ignoring birth year."""
+
+    if person.birthday is None:
+        return None
+
+    next_birthday = _birthday_for_year(person.birthday, today.year)
+    if next_birthday < today:
+        next_birthday = _birthday_for_year(person.birthday, today.year + 1)
+    return (next_birthday - today).days
+
+
+def birthday_text(person: Person, today: date) -> str:
+    """Return compact birthday text for table display."""
+
+    days = days_until_birthday(person, today)
+    if days is None:
+        return ""
+    if days == 0:
+        return "Today"
+    if days == 1:
+        return "Tomorrow"
+    if days <= 30:
+        return f"In {days} days"
+    birthday = person.birthday
+    if birthday is None:
+        return ""
+    return f"{month_abbr[birthday.month]} {birthday.day}"
+
+
 def days_since_contact_text(person: Person, today: date) -> str:
     """Return a compact days-since-contact value for display."""
 
@@ -95,3 +126,12 @@ def contact_method_label(value: str, fallback: str = "-") -> str:
         key.casefold(): label for key, label in PREFERRED_CONTACT_METHOD_OPTIONS
     }
     return labels.get(clean_value.casefold(), clean_value.replace("_", " ").title())
+
+
+def _birthday_for_year(birthday: date, year: int) -> date:
+    """Return this year's birthday date, moving Feb 29 to Mar 1 when needed."""
+
+    try:
+        return date(year, birthday.month, birthday.day)
+    except ValueError:
+        return date(year, 3, 1)

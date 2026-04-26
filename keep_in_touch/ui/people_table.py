@@ -6,12 +6,15 @@ from datetime import date
 from typing import ClassVar
 
 from PySide6.QtCore import QPoint, Qt, Signal
-from PySide6.QtGui import QMouseEvent
+from PySide6.QtGui import QBrush, QColor, QFont, QMouseEvent
 from PySide6.QtWidgets import QHeaderView, QTableWidget, QTableWidgetItem
 
 from keep_in_touch.domain.formulas import days_since_contact
 from keep_in_touch.domain.display import (
+    birthday_text,
+    date_text,
     days_since_contact_text,
+    days_until_birthday,
     display_name,
     tags_text,
 )
@@ -28,6 +31,7 @@ class PeopleTableColumn:
     width: int
     value: Callable[[Person, date], str]
     sort_value: Callable[[Person, date], object]
+    decorate: Callable[[QTableWidgetItem, Person, date], None] | None = None
 
 
 class SortableTableItem(QTableWidgetItem):
@@ -64,6 +68,74 @@ def _days_since_contact_sort_value(person: Person, today: date) -> int:
 
     days = days_since_contact(person, today)
     return days if days is not None else 10_000_000
+
+
+def _birthday_cell(person: Person, today: date) -> str:
+    """Return birthday column text."""
+
+    return birthday_text(person, today)
+
+
+def _birthday_sort_value(person: Person, today: date) -> int:
+    """Return days until birthday for sorting."""
+
+    days = days_until_birthday(person, today)
+    return days if days is not None else 10_000_000
+
+
+def _decorate_birthday_cell(
+    item: QTableWidgetItem,
+    person: Person,
+    today: date,
+) -> None:
+    """Decorate birthday cells by proximity to the next birthday."""
+
+    days = days_until_birthday(person, today)
+    if days is None:
+        return
+
+    if days == 0:
+        item.setText("BIRTHDAY TODAY")
+        item.setBackground(QBrush(QColor("#2f6f4e")))
+        item.setForeground(QBrush(QColor("#edf7f0")))
+        font = item.font()
+        font.setBold(True)
+        font.setWeight(QFont.Weight.Bold)
+        item.setFont(font)
+    else:
+        item.setBackground(QBrush(_birthday_proximity_color(days)))
+        item.setForeground(QBrush(QColor("#f8fafc")))
+
+    item.setToolTip(_birthday_tooltip(person, today, days))
+
+
+def _birthday_proximity_color(days: int) -> QColor:
+    """Return a calm dark blue-to-green shade based on birthday proximity."""
+
+    far_color = QColor("#1f2937")
+    near_color = QColor("#285f48")
+    progress = 1.0 - min(days, 180) / 180
+    red = _interpolate(far_color.red(), near_color.red(), progress)
+    green = _interpolate(far_color.green(), near_color.green(), progress)
+    blue = _interpolate(far_color.blue(), near_color.blue(), progress)
+    return QColor(red, green, blue)
+
+
+def _interpolate(start: int, end: int, progress: float) -> int:
+    """Return an integer between two channel values."""
+
+    return round(start + (end - start) * progress)
+
+
+def _birthday_tooltip(person: Person, today: date, days: int) -> str:
+    """Return helpful birthday hover text."""
+
+    birthday = date_text(person.birthday)
+    if days == 0:
+        return f"Birthday: {birthday}. Say happy birthday today."
+    if days == 1:
+        return f"Birthday: {birthday}. Birthday is tomorrow."
+    return f"Birthday: {birthday}. Next birthday is in {days} days."
 
 
 def _relationship_cell(person: Person, today: date) -> str:
@@ -115,6 +187,13 @@ class PeopleTable(QTableWidget):
             160,
             _days_since_contact_cell,
             _days_since_contact_sort_value,
+        ),
+        PeopleTableColumn(
+            "Birthday",
+            145,
+            _birthday_cell,
+            _birthday_sort_value,
+            _decorate_birthday_cell,
         ),
         PeopleTableColumn(
             "Relationship",
@@ -193,6 +272,8 @@ class PeopleTable(QTableWidget):
                     Qt.ItemDataRole.UserRole,
                     table_column.sort_value(person, today),
                 )
+                if table_column.decorate is not None:
+                    table_column.decorate(item, person, today)
                 if column == 0:
                     item.setData(PERSON_ID_ROLE, person.id)
                 self.setItem(row, column, item)
