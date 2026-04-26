@@ -139,14 +139,14 @@ class MainWindow(QMainWindow):
         self.clear_selection_action.setShortcut(QKeySequence.StandardKey.Cancel)
         self.clear_selection_action.triggered.connect(self.clear_selection)
 
-        self.import_people_action = QAction("Import People CSV...", self)
-        self.import_people_action.triggered.connect(self.import_people_csv)
+        self.import_people_action = QAction("Import People...", self)
+        self.import_people_action.triggered.connect(self.import_people)
 
-        self.export_people_action = QAction("Export People CSV...", self)
-        self.export_people_action.triggered.connect(self.export_people_csv)
+        self.export_people_action = QAction("Export People...", self)
+        self.export_people_action.triggered.connect(self.export_people)
 
-        self.export_interactions_action = QAction("Export Interactions CSV...", self)
-        self.export_interactions_action.triggered.connect(self.export_interactions_csv)
+        self.export_interactions_action = QAction("Export Interactions...", self)
+        self.export_interactions_action.triggered.connect(self.export_interactions)
 
         self.refresh_action = QAction("Refresh", self)
         self.refresh_action.setShortcut(QKeySequence.StandardKey.Refresh)
@@ -478,51 +478,74 @@ class MainWindow(QMainWindow):
         self.detail_panel.clear_person()
         self._update_action_state()
 
-    def export_people_csv(self) -> None:
-        """Export people CSV to a chosen file."""
+    def export_people(self) -> None:
+        """Export people to a chosen CSV or JSONL file."""
 
         if not self._require_data_folder():
             return
 
-        path = self._save_path("people.csv")
+        path = self._save_path("people.jsonl")
         if path is None:
             return
 
-        self._import_export_service().export_people_csv(path, today=today_local())
+        try:
+            self._import_export_service().export_people_file(
+                path,
+                today=today_local(),
+            )
+        except ValueError as exc:
+            QMessageBox.warning(self, "Export failed", str(exc))
+            return
+
         QMessageBox.information(self, "Export complete", f"Saved {path}")
 
-    def export_interactions_csv(self) -> None:
-        """Export interactions CSV to a chosen file."""
+    def export_interactions(self) -> None:
+        """Export interactions to a chosen CSV or JSONL file."""
 
         if not self._require_data_folder():
             return
 
-        path = self._save_path("interactions.csv")
+        path = self._save_path("interactions.jsonl")
         if path is None:
             return
 
-        self._import_export_service().export_interactions_csv(path)
+        try:
+            self._import_export_service().export_interactions_file(path)
+        except ValueError as exc:
+            QMessageBox.warning(self, "Export failed", str(exc))
+            return
+
         QMessageBox.information(self, "Export complete", f"Saved {path}")
 
-    def import_people_csv(self) -> None:
-        """Import people from CSV."""
+    def import_people(self) -> None:
+        """Import people from a supported CSV or JSONL file."""
 
         if not self._require_data_folder():
             return
 
         filename, _ = QFileDialog.getOpenFileName(
             self,
-            "Import People CSV",
+            "Import People",
             str(self.config.exports_dir),
-            "CSV Files (*.csv);;All Files (*)",
+            "People Files (*.jsonl *.csv);;JSONL Files (*.jsonl);;CSV Files (*.csv)",
             options=QFileDialog.Option.DontUseNativeDialog,
         )
         if not filename:
             return
 
-        imported = self._import_export_service().import_people_csv(
-            Path(filename), today=today_local()
-        )
+        try:
+            imported = self._import_export_service().import_people_file(
+                Path(filename),
+                today=today_local(),
+            )
+        except ValueError as exc:
+            QMessageBox.warning(
+                self,
+                "Import failed",
+                str(exc),
+            )
+            return
+
         self.refresh_people()
         QMessageBox.information(
             self,
@@ -549,9 +572,9 @@ class MainWindow(QMainWindow):
         default_path = self.config.exports_dir / filename
         selected, _ = QFileDialog.getSaveFileName(
             self,
-            "Save CSV",
+            "Save Export",
             str(default_path),
-            "CSV Files (*.csv);;All Files (*)",
+            "JSONL Files (*.jsonl);;CSV Files (*.csv)",
             options=QFileDialog.Option.DontUseNativeDialog,
         )
         return Path(selected) if selected else None
