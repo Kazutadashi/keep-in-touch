@@ -8,6 +8,7 @@ from keep_in_touch.domain.display import (
     date_text,
     display_name,
     middle_name,
+    social_lines,
     tags_text,
 )
 from keep_in_touch.domain.models import Interaction, Person
@@ -52,6 +53,9 @@ class PersonDetailPanel(QTextEdit):
             _field("Relationship", person.relationship),
             _field("Preferred method", person.preferred_contact_method),
             _field("Tags", tags_text(person)),
+            "",
+            _section("Social Handles"),
+            *_social_handle_lines(person),
             "",
             _section("Contact Rhythm"),
             _field("Status", contact_status(person)),
@@ -114,3 +118,12 @@ def _block(text: str) -> str:
     if not stripped:
         return "  -"
     return "\n".join(f"  {line}" if line else "" for line in stripped.splitlines())
+
+
+def _social_handle_lines(person: Person) -> list[str]:
+    """Return formatted social handle rows."""
+
+    handles = social_lines(person)
+    if not handles:
+        return ["  -"]
+    return [_field(label, value) for label, value in handles]

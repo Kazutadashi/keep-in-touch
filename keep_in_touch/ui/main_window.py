@@ -25,7 +25,12 @@ from PySide6.QtWidgets import (
 
 from keep_in_touch.app.app_config import AppConfig
 from keep_in_touch.domain.date_utils import today_local
-from keep_in_touch.domain.display import date_text, display_name, tags_text
+from keep_in_touch.domain.display import (
+    date_text,
+    display_name,
+    social_lines,
+    tags_text,
+)
 from keep_in_touch.domain.models import Interaction, Person
 from keep_in_touch.services.import_export_service import ImportExportService
 from keep_in_touch.services.interaction_service import InteractionService
@@ -672,6 +677,11 @@ class MainWindow(QMainWindow):
             "Notes:",
             person.notes or "-",
         ]
+
+        social_handles = social_lines(person)
+        if social_handles:
+            lines.extend(["", "Social handles:"])
+            lines.extend(f"{label}: {value}" for label, value in social_handles)
 
         if last_interaction is not None:
             lines.extend(_interaction_summary_lines(last_interaction))

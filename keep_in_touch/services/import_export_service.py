@@ -4,7 +4,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-from keep_in_touch.domain.models import Person
+from keep_in_touch.domain.models import Person, SOCIAL_PLATFORMS
 from keep_in_touch.domain.serialization import (
     interaction_to_record,
     person_from_record,
@@ -26,6 +26,7 @@ PEOPLE_CSV_FIELDS = [
     "tags",
     "relationship",
     "preferred_contact_method",
+    *[f"social_{key}" for key, _label in SOCIAL_PLATFORMS],
     "contact_interval_days",
     "last_contacted_at",
     "next_contact_at",
@@ -68,7 +69,7 @@ class ImportExportService:
         """Export people to CSV."""
 
         rows = [
-            person_to_record(person)
+            _person_csv_row(person)
             for person in self.people_service.list_people(today)
         ]
         write_csv(path, rows, PEOPLE_CSV_FIELDS)
@@ -143,8 +144,16 @@ def _normalize_people_csv_row(row: dict[str, str]) -> dict[str, Any]:
     }
 
     normalized: dict[str, Any] = {}
+    socials: dict[str, str] = {}
     for key, value in row.items():
         clean_key = key.strip().lower().replace(" ", "_")
+        if clean_key.startswith("social_"):
+            platform = clean_key.removeprefix("social_")
+            handle = value.strip() if isinstance(value, str) else value
+            if platform and handle:
+                socials[platform] = str(handle)
+            continue
+
         target = aliases.get(clean_key, clean_key)
         normalized[target] = value.strip() if isinstance(value, str) else value
 
@@ -156,4 +165,18 @@ def _normalize_people_csv_row(row: dict[str, str]) -> dict[str, Any]:
         normalized["first_name"] = first_name
         normalized["last_name"] = last_name
 
+    if socials:
+        normalized["socials"] = socials
+
     return normalized
+
+
+def _person_csv_row(person: Person) -> dict[str, Any]:
+    """Return a flattened CSV row for a person."""
+
+    row = person_to_record(person)
+    socials = person.socials
+    for platform, _label in SOCIAL_PLATFORMS:
+        row[f"social_{platform}"] = socials.get(platform, "")
+    row.pop("socials", None)
+    return row

@@ -13,6 +13,7 @@ from keep_in_touch.domain.models import Interaction, Person
 from keep_in_touch.domain.validation import (
     normalize_contact_interval_days,
     normalize_relationship,
+    normalize_socials,
     normalize_tags,
     normalize_text,
 )
@@ -31,6 +32,7 @@ PERSON_FIELDS = {
     "relationship_type",  # Legacy field name. Read during migration; do not write.
     "importance",  # Legacy field. Ignored because relationship is categorical now.
     "preferred_contact_method",
+    "socials",
     "contact_interval_days",
     "last_contacted_at",
     "next_contact_at",
@@ -92,6 +94,7 @@ def person_from_record(record: Mapping[str, Any]) -> Person:
         tags=normalize_tags(record.get("tags")),
         relationship=normalize_relationship(relationship_value),
         preferred_contact_method=normalize_text(record.get("preferred_contact_method")),
+        socials=normalize_socials(record.get("socials")),
         contact_interval_days=normalize_contact_interval_days(
             record.get("contact_interval_days", 30)
         ),
@@ -129,6 +132,7 @@ def person_to_record(person: Person) -> dict[str, Any]:
             "tags": person.tags,
             "relationship": person.relationship,
             "preferred_contact_method": person.preferred_contact_method,
+            "socials": person.socials,
             "contact_interval_days": person.contact_interval_days,
             "last_contacted_at": date_to_string(person.last_contacted_at),
             "next_contact_at": date_to_string(person.next_contact_at),

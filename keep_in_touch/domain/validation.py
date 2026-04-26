@@ -61,6 +61,28 @@ def normalize_tags(value: object) -> list[str]:
     return []
 
 
+def normalize_socials(value: object) -> dict[str, str]:
+    """Normalize social handles from a mapping.
+
+    Empty handles are removed. Keys are lowercased and stripped so storage stays
+    predictable while still allowing future platform names.
+
+    Example:
+        assert normalize_socials({"Discord": " jane "}) == {"discord": "jane"}
+    """
+
+    if not isinstance(value, dict):
+        return {}
+
+    socials: dict[str, str] = {}
+    for key, handle in value.items():
+        platform = normalize_text(key).lower()
+        text = normalize_text(handle)
+        if platform and text:
+            socials[platform] = text
+    return socials
+
+
 def normalize_text(value: object) -> str:
     """Convert a value to stripped text.
 

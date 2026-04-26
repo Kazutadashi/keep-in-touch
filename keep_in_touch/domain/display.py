@@ -2,7 +2,7 @@
 
 from datetime import date
 
-from keep_in_touch.domain.models import Person
+from keep_in_touch.domain.models import Person, SOCIAL_PLATFORMS
 
 
 def middle_name(person: Person) -> str:
@@ -31,6 +31,27 @@ def tags_text(person: Person, fallback: str = "-") -> str:
     """Return comma-separated tags for display."""
 
     return ", ".join(person.tags) if person.tags else fallback
+
+
+def social_lines(person: Person) -> list[tuple[str, str]]:
+    """Return social handles as display label/value pairs.
+
+    Known platforms are returned in UI order. Unknown platforms are included
+    afterward so data from newer versions is still visible.
+    """
+
+    known_keys = {key for key, _label in SOCIAL_PLATFORMS}
+    lines = [
+        (label, person.socials[key])
+        for key, label in SOCIAL_PLATFORMS
+        if person.socials.get(key)
+    ]
+    lines.extend(
+        (key.replace("_", " ").title(), value)
+        for key, value in sorted(person.socials.items())
+        if key not in known_keys and value
+    )
+    return lines
 
 
 def date_text(value: date | None, fallback: str = "-") -> str:

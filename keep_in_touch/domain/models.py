@@ -26,6 +26,29 @@ later without requiring a schema change.
 """
 
 
+SOCIAL_PLATFORMS = [
+    ("discord", "Discord"),
+    ("matrix", "Matrix"),
+    ("linkedin", "LinkedIn"),
+    ("facebook", "Facebook"),
+    ("instagram", "Instagram"),
+    ("x", "X / Twitter"),
+    ("bluesky", "Bluesky"),
+    ("mastodon", "Mastodon"),
+    ("github", "GitHub"),
+    ("reddit", "Reddit"),
+    ("telegram", "Telegram"),
+    ("signal", "Signal"),
+    ("whatsapp", "WhatsApp"),
+    ("website", "Website"),
+]
+"""Known social/contact platforms shown in the user interface.
+
+The stored data remains a dictionary so additional platforms can be preserved
+without requiring a schema migration.
+"""
+
+
 @dataclass
 class Person:
     """Represents one person in the relationship tracker.
@@ -52,6 +75,7 @@ class Person:
     tags: list[str] = field(default_factory=list)
     relationship: str = "Friend"
     preferred_contact_method: str = ""
+    socials: dict[str, str] = field(default_factory=dict)
     contact_interval_days: int = 30
     last_contacted_at: date | None = None
     next_contact_at: date | None = None

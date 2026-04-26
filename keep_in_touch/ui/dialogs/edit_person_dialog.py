@@ -5,16 +5,26 @@ from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QFormLayout,
+    QHBoxLayout,
+    QLabel,
     QLineEdit,
     QMessageBox,
     QPlainTextEdit,
+    QPushButton,
     QSpinBox,
     QVBoxLayout,
+    QWidget,
 )
 
+from keep_in_touch.domain.display import social_lines
 from keep_in_touch.domain.date_utils import parse_date
 from keep_in_touch.domain.models import Person, RELATIONSHIP_OPTIONS
-from keep_in_touch.domain.validation import normalize_relationship, normalize_tags
+from keep_in_touch.domain.validation import (
+    normalize_relationship,
+    normalize_socials,
+    normalize_tags,
+)
+from keep_in_touch.ui.dialogs.edit_socials_dialog import EditSocialsDialog
 
 
 class EditPersonDialog(QDialog):
@@ -32,6 +42,7 @@ class EditPersonDialog(QDialog):
         super().__init__()
         self.setWindowTitle("Edit Person" if person else "Add Person")
         self._person = person
+        self.socials = normalize_socials(person.socials if person else {})
 
         self.first_name_edit = QLineEdit(person.first_name if person else "")
         self.last_name_edit = QLineEdit(person.last_name if person else "")
@@ -48,6 +59,11 @@ class EditPersonDialog(QDialog):
         self.relationship_combo.setCurrentText(normalize_relationship(relationship))
 
         self.method_edit = QLineEdit(person.preferred_contact_method if person else "")
+        self.socials_summary_label = QLabel()
+        self.socials_summary_label.setWordWrap(True)
+        self.edit_socials_button = QPushButton("Edit Social Handles...")
+        self.edit_socials_button.clicked.connect(self._edit_socials)
+        self._refresh_socials_summary()
         self.interval_spin = QSpinBox()
         self.interval_spin.setRange(1, 3650)
         self.interval_spin.setValue(person.contact_interval_days if person else 30)
@@ -67,6 +83,7 @@ class EditPersonDialog(QDialog):
         form.addRow("Tags", self.tags_edit)
         form.addRow("Relationship", self.relationship_combo)
         form.addRow("Preferred method", self.method_edit)
+        form.addRow("Social handles", self._create_socials_row())
         form.addRow("Contact interval days", self.interval_spin)
         form.addRow("Last contacted (YYYY-MM-DD)", self.last_contacted_edit)
         form.addRow("Bio", self.bio_edit)
@@ -125,6 +142,7 @@ class EditPersonDialog(QDialog):
             tags=normalize_tags(self.tags_edit.text()),
             relationship=normalize_relationship(self.relationship_combo.currentText()),
             preferred_contact_method=self.method_edit.text().strip(),
+            socials=normalize_socials(self.socials),
             contact_interval_days=self.interval_spin.value(),
             last_contacted_at=parse_date(self.last_contacted_edit.text()),
             bio=self.bio_edit.toPlainText().strip(),
@@ -135,3 +153,36 @@ class EditPersonDialog(QDialog):
             updated_at=existing.updated_at if existing else None,
             extra_fields=dict(existing.extra_fields) if existing else {},
         )
+
+    def _create_socials_row(self) -> QWidget:
+        """Create the compact social handles row for the main form."""
+
+        row = QWidget()
+        layout = QHBoxLayout(row)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self.socials_summary_label, stretch=1)
+        layout.addWidget(self.edit_socials_button)
+        return row
+
+    def _edit_socials(self) -> None:
+        """Open the dedicated social handles dialog."""
+
+        dialog = EditSocialsDialog(self.socials)
+        if dialog.exec():
+            self.socials = dialog.socials()
+            self._refresh_socials_summary()
+
+    def _refresh_socials_summary(self) -> None:
+        """Update the compact social handles summary."""
+
+        preview_person = Person(id="", first_name="", socials=self.socials)
+        handles = social_lines(preview_person)
+        if not handles:
+            self.socials_summary_label.setText("No handles saved")
+            return
+
+        handle_count = len(handles)
+        visible_labels = ", ".join(label for label, _value in handles[:3])
+        if handle_count > 3:
+            visible_labels = f"{visible_labels} +{handle_count - 3} more"
+        self.socials_summary_label.setText(visible_labels)
