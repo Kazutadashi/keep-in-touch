@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "keep-in-touch"
+version = "0.1.0"
+description = "A local-first personal relationship tracker built with PySide6 and plain text data files."
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "Keep in Touch Contributors" }]
+license = { text = "MIT" }
+dependencies = [
+    "PySide6>=6.7",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "ruff>=0.6",
+    "mypy>=1.10",
+]
+
+[project.scripts]
+keep-in-touch = "keep_in_touch.app.main:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["keep_in_touch*"]
+exclude = ["tests*", "examples*", "data*"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unused_ignores = true
+warn_redundant_casts = true
