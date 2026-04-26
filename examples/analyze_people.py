@@ -2,7 +2,7 @@
 
 Run from the repository root:
 
-    python examples/analyze_people.py examples/many_people.jsonl
+    python examples/analyze_people.py examples/demo_data/people.jsonl
 
 The script uses only the Python standard library to show that Keep in Touch data
 is easy to inspect, aggregate, and prepare for deeper analysis.
@@ -36,7 +36,7 @@ def parse_args() -> argparse.Namespace:
         "people_path",
         type=Path,
         nargs="?",
-        default=Path("examples/many_people.jsonl"),
+        default=Path("examples/demo_data/people.jsonl"),
         help="Path to a people JSONL file.",
     )
     parser.add_argument(

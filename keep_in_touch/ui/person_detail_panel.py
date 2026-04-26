@@ -49,6 +49,7 @@ class PersonDetailPanel(QTextEdit):
             _title(name),
             "",
             _section("Identity"),
+            _field("User ID", person.id),
             _field("First name", person.first_name),
             _field("Middle name", middle_name(person)),
             _field("Last name", person.last_name),
@@ -85,17 +86,7 @@ class PersonDetailPanel(QTextEdit):
             lines.append(_empty("No interactions logged yet."))
 
         for interaction in interactions:
-            lines.extend(
-                [
-                    "",
-                    _subsection(
-                        f"{interaction.date.isoformat()} - "
-                        f"{interaction.interaction_type or 'interaction'}"
-                    ),
-                    _field("Summary", interaction.summary),
-                    _field("Follow-up", interaction.follow_up_notes),
-                ]
-            )
+            lines.extend(["", *_interaction_block(interaction)])
 
         self.setPlainText("\n".join(lines))
 
@@ -118,6 +109,22 @@ def _subsection(text: str) -> str:
     """Return a compact subsection heading."""
 
     return f"  [{text}]"
+
+
+def _interaction_block(interaction: Interaction) -> list[str]:
+    """Return a visually separated ASCII block for one interaction."""
+
+    title = f"{interaction.date.isoformat()} - {interaction.interaction_type or 'interaction'}"
+    return [
+        _minor_border(),
+        _boxed_line(title),
+        _minor_border(),
+        _field("Interaction ID", interaction.id),
+        _field("Date", interaction.date.isoformat()),
+        _field("Type", interaction.interaction_type or "interaction"),
+        _field("Summary", interaction.summary),
+        _field("Follow-up", interaction.follow_up_notes),
+    ]
 
 
 def _field(label: str, value: object) -> str:
@@ -154,4 +161,11 @@ def _empty(text: str = "-") -> str:
 def _boxed_line(text: str) -> str:
     """Return text padded inside a fixed-width ASCII box."""
 
-    return f"| {text.ljust(PANEL_WIDTH - 2)} |"
+    clipped = text[: PANEL_WIDTH - 2]
+    return f"| {clipped.ljust(PANEL_WIDTH - 2)} |"
+
+
+def _minor_border() -> str:
+    """Return a lighter fixed-width border for repeated blocks."""
+
+    return "+" + "." * PANEL_WIDTH + "+"

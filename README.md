@@ -99,6 +99,8 @@ python run_app.py
 
 When you open Keep in Touch, you will see a list of people and how many days it has been since you last contacted each person.
 
+To try the app with sample data, choose `File > Set Data Folder...` and select `examples/demo_data`. That folder already has the normal app layout, so the example people and interactions will appear without importing anything.
+
 You can:
 
 - Add a person
