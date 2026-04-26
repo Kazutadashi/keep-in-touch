@@ -636,7 +636,7 @@ class MainWindow(QMainWindow):
         if not self._has_data_folder():
             return
 
-        dialog = EditPersonDialog(person)
+        dialog = EditPersonDialog(person, self._interaction_service())
         if dialog.exec():
             self._people_service().update_person(
                 dialog.to_person(),

@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 )
 
 from keep_in_touch.domain.date_utils import parse_date
+from keep_in_touch.domain.models import Interaction
 
 
 class InteractionDialogValues(TypedDict):
@@ -35,18 +36,23 @@ class LogInteractionDialog(QDialog):
             data = dialog.values()
     """
 
-    def __init__(self) -> None:
-        """Create an empty interaction form with today's date prefilled."""
+    def __init__(self, interaction: Interaction | None = None) -> None:
+        """Create an interaction form, optionally prefilled for editing."""
 
         super().__init__()
-        self.setWindowTitle("Log Interaction")
+        self.setWindowTitle("Edit Interaction" if interaction else "Log Interaction")
 
-        self.date_edit = QLineEdit(date.today().isoformat())
+        initial_date = interaction.date if interaction else date.today()
+        self.date_edit = QLineEdit(initial_date.isoformat())
         self.type_combo = QComboBox()
         self.type_combo.setEditable(True)
         self.type_combo.addItems(["text", "call", "email", "in-person", "other"])
-        self.summary_edit = QPlainTextEdit()
-        self.follow_up_edit = QPlainTextEdit()
+        if interaction and interaction.interaction_type:
+            self.type_combo.setCurrentText(interaction.interaction_type)
+        self.summary_edit = QPlainTextEdit(interaction.summary if interaction else "")
+        self.follow_up_edit = QPlainTextEdit(
+            interaction.follow_up_notes if interaction else "",
+        )
 
         form = QFormLayout()
         form.addRow("Date (YYYY-MM-DD)", self.date_edit)

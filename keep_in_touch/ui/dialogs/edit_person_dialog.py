@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from keep_in_touch.domain.date_utils import today_local
 from keep_in_touch.domain.display import social_lines
 from keep_in_touch.domain.models import (
     PREFERRED_CONTACT_METHOD_OPTIONS,
@@ -31,6 +32,8 @@ from keep_in_touch.domain.validation import (
     normalize_socials,
     normalize_tags,
 )
+from keep_in_touch.services.interaction_service import InteractionService
+from keep_in_touch.ui.dialogs.edit_interactions_dialog import EditInteractionsDialog
 from keep_in_touch.ui.dialogs.edit_socials_dialog import EditSocialsDialog
 
 NULL_DATE = QDate(1900, 1, 1)
@@ -45,12 +48,17 @@ class EditPersonDialog(QDialog):
             person = dialog.to_person()
     """
 
-    def __init__(self, person: Person | None = None) -> None:
+    def __init__(
+        self,
+        person: Person | None = None,
+        interaction_service: InteractionService | None = None,
+    ) -> None:
         """Create the dialog, optionally prefilled with an existing person."""
 
         super().__init__()
         self.setWindowTitle("Edit Person" if person else "Add Person")
         self._person = person
+        self._interaction_service = interaction_service
         self.socials = normalize_socials(person.socials if person else {})
 
         self.first_name_edit = QLineEdit(person.first_name if person else "")
@@ -78,6 +86,11 @@ class EditPersonDialog(QDialog):
         self.edit_socials_button = QPushButton("Edit Social Handles...")
         self.edit_socials_button.clicked.connect(self._edit_socials)
         self._refresh_socials_summary()
+        self.edit_interactions_button = QPushButton("Edit Interactions...")
+        self.edit_interactions_button.clicked.connect(self._edit_interactions)
+        self.edit_interactions_button.setEnabled(
+            person is not None and interaction_service is not None,
+        )
         last_contacted = person.last_contacted_at if person else None
         self.last_contacted_edit = _optional_date_edit(last_contacted)
         self.bio_edit = QPlainTextEdit(person.bio if person else "")
@@ -99,6 +112,7 @@ class EditPersonDialog(QDialog):
         )
         form.addRow("Social handles", self._create_socials_row())
         form.addRow("Last contacted (YYYY-MM-DD)", self.last_contacted_edit)
+        form.addRow("Interactions", self.edit_interactions_button)
         form.addRow("Bio", self.bio_edit)
         form.addRow("Notes", self.notes_edit)
 
@@ -169,6 +183,39 @@ class EditPersonDialog(QDialog):
         if dialog.exec():
             self.socials = dialog.socials()
             self._refresh_socials_summary()
+
+    def _edit_interactions(self) -> None:
+        """Open the dedicated interaction history dialog."""
+
+        if self._person is None or self._interaction_service is None:
+            QMessageBox.information(
+                self,
+                "Save person first",
+                "Save this person before editing interactions.",
+            )
+            return
+
+        dialog = EditInteractionsDialog(self._person, self._interaction_service)
+        dialog.exec()
+        self._refresh_person_after_interaction_edits()
+
+    def _refresh_person_after_interaction_edits(self) -> None:
+        """Refresh fields that interactions can change while this dialog is open."""
+
+        if self._person is None or self._interaction_service is None:
+            return
+
+        updated_person = self._interaction_service.people_service.get_person(
+            self._person.id,
+            today=today_local(),
+        )
+        if updated_person is None:
+            return
+
+        self._person = updated_person
+        self.last_contacted_edit.setDate(
+            _qdate_from_date(updated_person.last_contacted_at),
+        )
 
     def _refresh_socials_summary(self) -> None:
         """Update the compact social handles summary."""

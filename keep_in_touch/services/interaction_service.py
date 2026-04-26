@@ -58,6 +58,39 @@ class InteractionService:
             item for item in self.list_interactions() if item.person_id == person_id
         ]
 
+    def update_interaction(self, interaction: Interaction, today: date) -> Interaction:
+        """Update an existing interaction and refresh its person's contact date."""
+
+        interactions = self.list_interactions()
+        for index, existing in enumerate(interactions):
+            if existing.id == interaction.id:
+                interaction.person_id = existing.person_id
+                interaction.created_at = interaction.created_at or existing.created_at
+                interaction.updated_at = utc_now()
+                interactions[index] = interaction
+                self._save_interactions(interactions)
+                self._refresh_person_contact_date(interaction.person_id, today)
+                return interaction
+        raise ValueError(f"Interaction not found: {interaction.id}")
+
+    def delete_interaction(self, interaction_id: str, today: date) -> None:
+        """Delete one interaction and refresh its person's contact date."""
+
+        interactions = self.list_interactions()
+        deleted_person_id = ""
+        remaining: list[Interaction] = []
+        for interaction in interactions:
+            if interaction.id == interaction_id:
+                deleted_person_id = interaction.person_id
+            else:
+                remaining.append(interaction)
+
+        if not deleted_person_id:
+            raise ValueError(f"Interaction not found: {interaction_id}")
+
+        self._save_interactions(remaining)
+        self._refresh_person_contact_date(deleted_person_id, today)
+
     def log_interaction(
         self,
         person_id: str,
@@ -92,9 +125,7 @@ class InteractionService:
 
         interactions = self.list_interactions()
         interactions.append(interaction)
-        self.interactions_store.write_all(
-            [interaction_to_record(item) for item in interactions]
-        )
+        self._save_interactions(interactions)
 
         is_new_latest_contact = (
             person.last_contacted_at is None
@@ -114,6 +145,28 @@ class InteractionService:
         remaining = [
             item for item in self.list_interactions() if item.person_id != person_id
         ]
+        self._save_interactions(remaining)
+
+    def _save_interactions(self, interactions: list[Interaction]) -> None:
+        """Persist interactions in the store's native JSONL format."""
+
         self.interactions_store.write_all(
-            [interaction_to_record(item) for item in remaining]
+            [interaction_to_record(item) for item in interactions]
         )
+
+    def _refresh_person_contact_date(self, person_id: str, today: date) -> None:
+        """Set a person's last-contacted date from their remaining interactions."""
+
+        person = self.people_service.get_person(person_id=person_id, today=today)
+        if person is None:
+            return
+
+        dated_interactions = self.list_for_person(person_id)
+        person.last_contacted_at = (
+            max(interaction.date for interaction in dated_interactions)
+            if dated_interactions
+            else None
+        )
+        person.updated_at = utc_now()
+        recalculate_person(person, today)
+        self.people_service.update_person(person, today=today)
