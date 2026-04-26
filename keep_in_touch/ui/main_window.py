@@ -326,7 +326,7 @@ class MainWindow(QMainWindow):
         self.people = self._people_service().list_people(today=today)
         self.people_table.set_people(self.people, today=today)
 
-        self.data_folder_label.setText(f"Data folder: {self.config.require_data_dir()}")
+        self.data_folder_label.setText(f"Data folder: /home/user/Documents/example/data/path")
 
         if selected_id and any(person.id == selected_id for person in self.people):
             self._select_person_by_id(selected_id)

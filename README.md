@@ -2,6 +2,12 @@
 
 **Keep in Touch** is a simple, local-first desktop app for keeping track of personal relationships.
 
+<p align="center">
+  <img src="docs/images/app_preview.png" alt="Keep in Touch app screenshot" width="900">
+</p>
+(Note this is just randomly generated example data.)
+
+
 It helps you remember who you care about, when you last reached out, what you talked about, and when it may be time to reconnect.
 
 The goal is not to replace your contacts app, calendar, notes app, or a full CRM. Keep in Touch is designed to be a lightweight personal tool for staying intentional about the people in your life.
