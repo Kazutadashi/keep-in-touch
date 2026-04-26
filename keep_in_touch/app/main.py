@@ -30,7 +30,7 @@ def main() -> int:
     config = AppConfig(data_dir=remembered_data_dir)
 
     window = MainWindow(config=config)
-    window.resize(1200, 720)
+    window.resize(window.preferred_initial_size())
     window.show()
 
     return app.exec()

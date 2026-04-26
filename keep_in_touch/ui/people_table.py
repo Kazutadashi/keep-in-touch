@@ -1,13 +1,24 @@
 """Table widget for the main people list."""
 
+from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import date
+from typing import ClassVar
 
 from PySide6.QtCore import QPoint, Qt, Signal
 from PySide6.QtGui import QMouseEvent
 from PySide6.QtWidgets import QHeaderView, QTableWidget, QTableWidgetItem
 
-from keep_in_touch.domain.formulas import days_overdue
 from keep_in_touch.domain.models import Person
+
+
+@dataclass(frozen=True)
+class PeopleTableColumn:
+    """Display settings and value lookup for one people-table column."""
+
+    header: str
+    width: int
+    value: Callable[[Person, date], str]
 
 
 class PeopleTable(QTableWidget):
@@ -28,27 +39,57 @@ class PeopleTable(QTableWidget):
     person_double_clicked = Signal(str)
     selection_cleared = Signal()
 
-    HEADERS = [
-        "First Name",
-        "Last Name",
-        "Next Contact",
-        "Overdue",
-        "Relationship",
-        "Method",
-        "Tags",
+    COLUMNS: ClassVar[list[PeopleTableColumn]] = [
+        PeopleTableColumn("Name", 210, lambda person, today: display_name(person)),
+        PeopleTableColumn(
+            "Next Contact",
+            120,
+            lambda person, today: (
+                person.next_contact_at.isoformat()
+                if person.next_contact_at
+                else "Not set"
+            ),
+        ),
+        PeopleTableColumn(
+            "Status",
+            110,
+            lambda person, today: contact_status(person, today),
+        ),
+        PeopleTableColumn(
+            "Relationship",
+            130,
+            lambda person, today: person.relationship,
+        ),
+        PeopleTableColumn("Tags", 220, lambda person, today: ", ".join(person.tags)),
     ]
+    WIDTH_PADDING = 36
 
     def __init__(self) -> None:
-        super().__init__(0, len(self.HEADERS))
-        self.setHorizontalHeaderLabels(self.HEADERS)
+        super().__init__(0, len(self.COLUMNS))
+        self.setHorizontalHeaderLabels([column.header for column in self.COLUMNS])
         self.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.verticalHeader().setVisible(False)
-        self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.setHorizontalScrollMode(QTableWidget.ScrollMode.ScrollPerPixel)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.horizontalHeader().setMinimumSectionSize(70)
+        self.horizontalHeader().setStretchLastSection(True)
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        for index, column in enumerate(self.COLUMNS):
+            self.setColumnWidth(index, column.width)
         self.itemSelectionChanged.connect(self._emit_selection_change)
         self.itemDoubleClicked.connect(self._emit_person_double_clicked)
+
+    def preferred_width(self) -> int:
+        """Return the width needed to show the configured columns without scrolling."""
+
+        header_width = sum(
+            self.horizontalHeader().sectionSize(index)
+            for index in range(self.columnCount())
+        )
+        return header_width + self.WIDTH_PADDING
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
         """Clear the selection when the user clicks empty table space."""
@@ -77,18 +118,10 @@ class PeopleTable(QTableWidget):
         for person in people:
             row = self.rowCount()
             self.insertRow(row)
-            overdue = days_overdue(person, today)
-            values = [
-                person.first_name,
-                person.last_name,
-                person.next_contact_at.isoformat() if person.next_contact_at else "Not set",
-                str(overdue) if overdue else "",
-                person.relationship,
-                person.preferred_contact_method,
-                ", ".join(person.tags),
-            ]
-            for column, value in enumerate(values):
+            for column, table_column in enumerate(self.COLUMNS):
+                value = table_column.value(person, today)
                 item = QTableWidgetItem(value)
+                item.setToolTip(value)
                 if column == 0:
                     item.setData(Qt.ItemDataRole.UserRole, person.id)
                 self.setItem(row, column, item)
@@ -152,3 +185,34 @@ class PeopleTable(QTableWidget):
         value = first_column_item.data(Qt.ItemDataRole.UserRole)
         if value:
             self.person_double_clicked.emit(str(value))
+
+
+def display_name(person: Person) -> str:
+    """Return the table display name, including future middle-name data if present."""
+
+    middle_name = person.extra_fields.get(
+        "middle_name",
+        person.extra_fields.get("middle", ""),
+    )
+    parts = [person.first_name, str(middle_name), person.last_name]
+    return " ".join(part.strip() for part in parts if part.strip()) or "(Unnamed)"
+
+
+def contact_status(person: Person, today: date) -> str:
+    """Return a compact contact status for the table."""
+
+    if person.last_contacted_at is None:
+        return "Never contacted"
+    if person.next_contact_at is None:
+        return "Not scheduled"
+
+    days_until_contact = (person.next_contact_at - today).days
+    if days_until_contact < 0:
+        days_overdue_count = abs(days_until_contact)
+        suffix = "day" if days_overdue_count == 1 else "days"
+        return f"{days_overdue_count} {suffix} overdue"
+    if days_until_contact == 0:
+        return "Due today"
+
+    suffix = "day" if days_until_contact == 1 else "days"
+    return f"In {days_until_contact} {suffix}"

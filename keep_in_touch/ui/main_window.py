@@ -6,7 +6,7 @@ application workflows to services and keeps business logic out of the UI layer.
 
 from pathlib import Path
 
-from PySide6.QtCore import QPoint, Qt
+from PySide6.QtCore import QPoint, QSize, Qt
 from PySide6.QtGui import QAction, QGuiApplication, QKeySequence
 from PySide6.QtWidgets import (
     QFileDialog,
@@ -73,6 +73,20 @@ class MainWindow(QMainWindow):
 
         self._configure_services_from_config()
         self.refresh_people()
+
+    def preferred_initial_size(self) -> QSize:
+        """Return a startup size that shows current table columns before scrolling."""
+
+        detail_width = 680
+        outer_margin_width = 20
+        splitter_handle_width = 8
+        width = (
+            self.people_table.preferred_width()
+            + detail_width
+            + outer_margin_width
+            + splitter_handle_width
+        )
+        return QSize(width, 720)
 
     def _create_actions(self) -> None:
         """Create reusable menu and context-menu actions."""
@@ -173,7 +187,7 @@ class MainWindow(QMainWindow):
         splitter = QSplitter()
         splitter.addWidget(self._create_people_panel())
         splitter.addWidget(self.detail_panel)
-        splitter.setSizes([520, 680])
+        splitter.setSizes([self.people_table.preferred_width(), 680])
         central_layout.addWidget(splitter)
 
         self.setCentralWidget(central_widget)
