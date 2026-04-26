@@ -13,6 +13,10 @@ from PySide6.QtWidgets import (
     QPushButton,
     QVBoxLayout,
     QWidget,
+    QDateEdit
+)
+from PySide6.QtCore import (
+    QDate
 )
 
 from keep_in_touch.domain.display import social_lines
@@ -46,9 +50,12 @@ class EditPersonDialog(QDialog):
         self.first_name_edit = QLineEdit(person.first_name if person else "")
         self.last_name_edit = QLineEdit(person.last_name if person else "")
         self.nickname_edit = QLineEdit(person.nickname if person else "")
-        self.birthday_edit = QLineEdit(
-            person.birthday.isoformat() if person and person.birthday else ""
-        )
+        
+        self.birthday_edit = QDateEdit(person.birthday if person else QDate(1900, 1, 1))
+        self.birthday_edit.setMaximumDate(QDate.currentDate())
+        self.birthday_edit.setCalendarPopup(True)
+        self.birthday_edit.setDisplayFormat("yyyy-MM-dd")
+
         self.tags_edit = QLineEdit(", ".join(person.tags) if person else "")
 
         self.relationship_combo = QComboBox()
@@ -57,17 +64,16 @@ class EditPersonDialog(QDialog):
         relationship = person.relationship if person else RELATIONSHIP_OPTIONS[0]
         self.relationship_combo.setCurrentText(normalize_relationship(relationship))
 
-        self.method_edit = QLineEdit(person.preferred_contact_method if person else "")
+        self.method_edit = QLineEdit()
         self.socials_summary_label = QLabel()
         self.socials_summary_label.setWordWrap(True)
         self.edit_socials_button = QPushButton("Edit Social Handles...")
         self.edit_socials_button.clicked.connect(self._edit_socials)
         self._refresh_socials_summary()
-        self.last_contacted_edit = QLineEdit(
-            person.last_contacted_at.isoformat()
-            if person and person.last_contacted_at
-            else ""
-        )
+        self.last_contacted_edit = QDateEdit(QDate.currentDate())
+        self.last_contacted_edit.setCalendarPopup(True)
+        self.last_contacted_edit.setDisplayFormat("yyyy-MM-dd")
+        self.last_contacted_edit.setMaximumDate(QDate.currentDate())
         self.bio_edit = QPlainTextEdit(person.bio if person else "")
         self.notes_edit = QPlainTextEdit(person.notes if person else "")
 
