@@ -25,7 +25,7 @@ Keep in Touch is local-first. There is no account system, hosted backend, teleme
 Python 3.11 or newer is recommended. Clone the repository, create a virtual environment, install the development requirements, and run the app from the repository root.
 
 ```bash
-git clone https://github.com/YOUR-USERNAME/keep-in-touch.git
+git clone https://github.com/Kazutadashi/keep-in-touch
 cd keep-in-touch
 python -m venv .venv
 source .venv/bin/activate
@@ -39,11 +39,7 @@ On Windows PowerShell, activate the virtual environment with `.venv\Scripts\Acti
 
 When the application opens, choose `File > Set Data Folder...` and select or create a folder where Keep in Touch should store its data. The app will create the expected layout in that folder, including `people.jsonl`, `interactions.jsonl`, `settings.json`, `exports/`, and `backups/`. After that, you can add people, edit a person by double-clicking their row, log interactions, update interaction history from the edit-person dialog, and export your data for backup or analysis.
 
-To try the project with ready-made sample data, choose `File > Set Data Folder...` and select `examples/demo_data`. That directory already uses the normal app data-folder layout, so the example people and interactions appear immediately without any import step. The analysis script also uses that folder by default:
-
-```bash
-python examples/analyze_people.py
-```
+To try the project with ready-made sample data, choose `File > Set Data Folder...` and select `examples/demo_data`. That directory already uses the normal app data-folder layout, so the example people and interactions appear immediately without any import step.
 
 ## Data Model
 
