@@ -686,9 +686,13 @@ class MainWindow(QMainWindow):
 
         lines = [
             f"Name: {display_name(person)}",
+            f"ID: {person.id or '-'}",
             f"First name: {person.first_name or '-'}",
+            f"Middle name: {person.middle_name or '-'}",
             f"Last name: {person.last_name or '-'}",
             f"Nickname: {person.nickname or '-'}",
+            f"Email: {person.email or '-'}",
+            f"Phone: {person.phone or '-'}",
             f"Relationship: {person.relationship or '-'}",
             f"Preferred method: {person.preferred_contact_method or '-'}",
             f"Last contacted: {date_text(person.last_contacted_at)}",

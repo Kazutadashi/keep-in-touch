@@ -52,6 +52,8 @@ class PersonDetailPanel(QTextEdit):
             _field("Birthday", date_text(person.birthday)),
             "",
             _section("Connection"),
+            _field("Email", person.email),
+            _field("Phone", person.phone),
             _field("Relationship", person.relationship),
             _field("Preferred method", person.preferred_contact_method),
             _field("Tags", tags_text(person)),

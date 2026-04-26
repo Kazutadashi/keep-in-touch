@@ -69,6 +69,7 @@ def print_report(people: list[dict[str, Any]], today: date) -> None:
     print_counter("Preferred methods", preferred_method_counts(people))
     print_counter("Most common tags", tag_counts(people), limit=10)
     print_counter("Social platform coverage", social_platform_counts(people))
+    print_contact_field_coverage(people)
     print_contact_age_summary(people, today)
     print_stale_contacts(people, today, limit=5)
 
@@ -105,6 +106,18 @@ def social_platform_counts(people: list[dict[str, Any]]) -> Counter[str]:
         if isinstance(socials, dict):
             counts.update(key for key, value in socials.items() if value)
     return counts
+
+
+def print_contact_field_coverage(people: list[dict[str, Any]]) -> None:
+    """Print coverage for direct contact fields."""
+
+    total = len(people)
+    email_count = sum(1 for record in people if record.get("email"))
+    phone_count = sum(1 for record in people if record.get("phone"))
+    print("Direct contact coverage:")
+    print(f"  email: {email_count}/{total}")
+    print(f"  phone: {phone_count}/{total}")
+    print()
 
 
 def print_counter(title: str, counts: Counter[str], limit: int | None = None) -> None:
@@ -175,7 +188,11 @@ def days_since_contact(record: dict[str, Any], today: date) -> int | None:
 def full_name(record: dict[str, Any]) -> str:
     """Return a display name for a raw person record."""
 
-    parts = [record.get("first_name", ""), record.get("last_name", "")]
+    parts = [
+        record.get("first_name", ""),
+        record.get("middle_name", ""),
+        record.get("last_name", ""),
+    ]
     name = " ".join(str(part).strip() for part in parts if str(part).strip())
     return name or "(Unnamed)"
 

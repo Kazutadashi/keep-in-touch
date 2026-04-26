@@ -7,14 +7,9 @@ from keep_in_touch.domain.models import Person, SOCIAL_PLATFORMS
 
 
 def middle_name(person: Person) -> str:
-    """Return middle-name data from future-compatible extra fields.
+    """Return the person's middle name with legacy fallback support."""
 
-    The current schema does not have a dedicated middle-name field. Preserving
-    this lookup in one place lets the UI support future data without spreading
-    schema guesses through widgets.
-    """
-
-    value = person.extra_fields.get(
+    value = person.middle_name or person.extra_fields.get(
         "middle_name",
         person.extra_fields.get("middle", ""),
     )

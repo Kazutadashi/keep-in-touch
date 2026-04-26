@@ -1,7 +1,11 @@
 """Dialog for creating or editing a person."""
 
+from datetime import date
+
+from PySide6.QtCore import QDate
 from PySide6.QtWidgets import (
     QComboBox,
+    QDateEdit,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
@@ -13,14 +17,9 @@ from PySide6.QtWidgets import (
     QPushButton,
     QVBoxLayout,
     QWidget,
-    QDateEdit
-)
-from PySide6.QtCore import (
-    QDate
 )
 
 from keep_in_touch.domain.display import social_lines
-from keep_in_touch.domain.date_utils import parse_date
 from keep_in_touch.domain.models import Person, RELATIONSHIP_OPTIONS
 from keep_in_touch.domain.validation import (
     normalize_relationship,
@@ -28,6 +27,8 @@ from keep_in_touch.domain.validation import (
     normalize_tags,
 )
 from keep_in_touch.ui.dialogs.edit_socials_dialog import EditSocialsDialog
+
+NULL_DATE = QDate(1900, 1, 1)
 
 
 class EditPersonDialog(QDialog):
@@ -48,13 +49,13 @@ class EditPersonDialog(QDialog):
         self.socials = normalize_socials(person.socials if person else {})
 
         self.first_name_edit = QLineEdit(person.first_name if person else "")
+        self.middle_name_edit = QLineEdit(person.middle_name if person else "")
         self.last_name_edit = QLineEdit(person.last_name if person else "")
         self.nickname_edit = QLineEdit(person.nickname if person else "")
-        
-        self.birthday_edit = QDateEdit(person.birthday if person else QDate(1900, 1, 1))
-        self.birthday_edit.setMaximumDate(QDate.currentDate())
-        self.birthday_edit.setCalendarPopup(True)
-        self.birthday_edit.setDisplayFormat("yyyy-MM-dd")
+        self.email_edit = QLineEdit(person.email if person else "")
+        self.phone_edit = QLineEdit(person.phone if person else "")
+
+        self.birthday_edit = _optional_date_edit(person.birthday if person else None)
 
         self.tags_edit = QLineEdit(", ".join(person.tags) if person else "")
 
@@ -64,23 +65,26 @@ class EditPersonDialog(QDialog):
         relationship = person.relationship if person else RELATIONSHIP_OPTIONS[0]
         self.relationship_combo.setCurrentText(normalize_relationship(relationship))
 
-        self.method_edit = QLineEdit()
+        self.method_edit = QLineEdit(
+            person.preferred_contact_method if person else "",
+        )
         self.socials_summary_label = QLabel()
         self.socials_summary_label.setWordWrap(True)
         self.edit_socials_button = QPushButton("Edit Social Handles...")
         self.edit_socials_button.clicked.connect(self._edit_socials)
         self._refresh_socials_summary()
-        self.last_contacted_edit = QDateEdit(QDate.currentDate())
-        self.last_contacted_edit.setCalendarPopup(True)
-        self.last_contacted_edit.setDisplayFormat("yyyy-MM-dd")
-        self.last_contacted_edit.setMaximumDate(QDate.currentDate())
+        last_contacted = person.last_contacted_at if person else None
+        self.last_contacted_edit = _optional_date_edit(last_contacted)
         self.bio_edit = QPlainTextEdit(person.bio if person else "")
         self.notes_edit = QPlainTextEdit(person.notes if person else "")
 
         form = QFormLayout()
         form.addRow("First name *", self.first_name_edit)
+        form.addRow("Middle name", self.middle_name_edit)
         form.addRow("Last name", self.last_name_edit)
         form.addRow("Nickname", self.nickname_edit)
+        form.addRow("Email", self.email_edit)
+        form.addRow("Phone", self.phone_edit)
         form.addRow("Birthday (YYYY-MM-DD)", self.birthday_edit)
         form.addRow("Tags", self.tags_edit)
         form.addRow("Relationship", self.relationship_combo)
@@ -108,27 +112,7 @@ class EditPersonDialog(QDialog):
             QMessageBox.warning(self, "Missing first name", "First name is required.")
             return
 
-        invalid_date_label = self._first_invalid_date_label()
-        if invalid_date_label is not None:
-            QMessageBox.warning(
-                self,
-                "Invalid date",
-                f"{invalid_date_label} must use YYYY-MM-DD format.",
-            )
-            return
-
         super().accept()
-
-    def _first_invalid_date_label(self) -> str | None:
-        """Return the first date field label with invalid text."""
-
-        for label, value in (
-            ("Birthday", self.birthday_edit.text()),
-            ("Last contacted", self.last_contacted_edit.text()),
-        ):
-            if value.strip() and parse_date(value) is None:
-                return label
-        return None
 
     def to_person(self) -> Person:
         """Return dialog values as a Person."""
@@ -137,15 +121,18 @@ class EditPersonDialog(QDialog):
         return Person(
             id=existing.id if existing else "",
             first_name=self.first_name_edit.text().strip(),
+            middle_name=self.middle_name_edit.text().strip(),
             last_name=self.last_name_edit.text().strip(),
             nickname=self.nickname_edit.text().strip(),
-            birthday=parse_date(self.birthday_edit.text()),
+            email=self.email_edit.text().strip(),
+            phone=self.phone_edit.text().strip(),
+            birthday=_date_from_optional_edit(self.birthday_edit),
             tags=normalize_tags(self.tags_edit.text()),
             relationship=normalize_relationship(self.relationship_combo.currentText()),
             preferred_contact_method=self.method_edit.text().strip(),
             socials=normalize_socials(self.socials),
             contact_interval_days=existing.contact_interval_days if existing else 30,
-            last_contacted_at=parse_date(self.last_contacted_edit.text()),
+            last_contacted_at=_date_from_optional_edit(self.last_contacted_edit),
             bio=self.bio_edit.toPlainText().strip(),
             notes=self.notes_edit.toPlainText().strip(),
             schema_version=existing.schema_version if existing else 1,
@@ -187,3 +174,32 @@ class EditPersonDialog(QDialog):
         if handle_count > 3:
             visible_labels = f"{visible_labels} +{handle_count - 3} more"
         self.socials_summary_label.setText(visible_labels)
+
+
+def _optional_date_edit(value: date | None) -> QDateEdit:
+    """Create a nullable date editor using the minimum date as the empty value."""
+
+    edit = QDateEdit(_qdate_from_date(value))
+    edit.setMinimumDate(NULL_DATE)
+    edit.setMaximumDate(QDate.currentDate())
+    edit.setSpecialValueText("Not set")
+    edit.setCalendarPopup(True)
+    edit.setDisplayFormat("yyyy-MM-dd")
+    return edit
+
+
+def _qdate_from_date(value: date | None) -> QDate:
+    """Convert a Python date to QDate, or return the empty sentinel."""
+
+    if value is None:
+        return NULL_DATE
+    return QDate(value.year, value.month, value.day)
+
+
+def _date_from_optional_edit(edit: QDateEdit) -> date | None:
+    """Return a Python date from a nullable date editor."""
+
+    qdate = edit.date()
+    if qdate == NULL_DATE:
+        return None
+    return date(qdate.year(), qdate.month(), qdate.day())

@@ -23,8 +23,12 @@ PERSON_FIELDS = {
     "id",
     "name",  # Legacy field. Read during migration; do not write.
     "first_name",
+    "middle",  # Legacy/alternate middle-name field. Read; do not write.
+    "middle_name",
     "last_name",
     "nickname",
+    "email",
+    "phone",
     "bio",
     "birthday",
     "tags",
@@ -76,6 +80,7 @@ def person_from_record(record: Mapping[str, Any]) -> Person:
     }
 
     first_name = normalize_text(record.get("first_name"))
+    middle_name = normalize_text(record.get("middle_name") or record.get("middle"))
     last_name = normalize_text(record.get("last_name"))
 
     if not first_name and not last_name:
@@ -87,8 +92,11 @@ def person_from_record(record: Mapping[str, Any]) -> Person:
         schema_version=_int_from_record(record, "schema_version", 1),
         id=normalize_text(record.get("id")),
         first_name=first_name,
+        middle_name=middle_name,
         last_name=last_name,
         nickname=normalize_text(record.get("nickname")),
+        email=normalize_text(record.get("email")),
+        phone=normalize_text(record.get("phone")),
         bio=normalize_text(record.get("bio")),
         birthday=parse_date(record.get("birthday")),
         tags=normalize_tags(record.get("tags")),
@@ -125,8 +133,11 @@ def person_to_record(person: Person) -> dict[str, Any]:
             "schema_version": person.schema_version,
             "id": person.id,
             "first_name": person.first_name,
+            "middle_name": person.middle_name,
             "last_name": person.last_name,
             "nickname": person.nickname,
+            "email": person.email,
+            "phone": person.phone,
             "bio": person.bio,
             "birthday": date_to_string(person.birthday),
             "tags": person.tags,

@@ -68,8 +68,11 @@ class Person:
 
     id: str
     first_name: str
+    middle_name: str = ""
     last_name: str = ""
     nickname: str = ""
+    email: str = ""
+    phone: str = ""
     bio: str = ""
     birthday: date | None = None
     tags: list[str] = field(default_factory=list)
@@ -96,7 +99,11 @@ class Person:
             assert person.full_name == "Jane Doe"
         """
 
-        parts = [self.first_name.strip(), self.last_name.strip()]
+        parts = [
+            self.first_name.strip(),
+            self.middle_name.strip(),
+            self.last_name.strip(),
+        ]
         return " ".join(part for part in parts if part) or "(Unnamed)"
 
     @property
@@ -109,7 +116,12 @@ class Person:
         """
 
         if self.last_name.strip():
-            return f"{self.last_name.strip()}, {self.first_name.strip()}".lower()
+            given_names = " ".join(
+                part
+                for part in (self.first_name.strip(), self.middle_name.strip())
+                if part
+            )
+            return f"{self.last_name.strip()}, {given_names}".lower()
         return self.first_name.strip().lower()
 
 
