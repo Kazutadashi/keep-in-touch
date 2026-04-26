@@ -16,6 +16,9 @@ from keep_in_touch.domain.display import (
 )
 from keep_in_touch.domain.models import Interaction, Person
 
+PANEL_WIDTH = 72
+LABEL_WIDTH = 19
+
 
 class PersonDetailPanel(QTextEdit):
     """Display person details and interaction history.
@@ -79,16 +82,18 @@ class PersonDetailPanel(QTextEdit):
         ]
 
         if not interactions:
-            lines.append("  No interactions logged yet.")
+            lines.append(_empty("No interactions logged yet."))
 
         for interaction in interactions:
             lines.extend(
                 [
                     "",
-                    f"  [{interaction.date.isoformat()}] "
-                    f"{interaction.interaction_type or 'interaction'}",
-                    _field("Summary", interaction.summary, indent="    "),
-                    _field("Follow-up", interaction.follow_up_notes, indent="    "),
+                    _subsection(
+                        f"{interaction.date.isoformat()} - "
+                        f"{interaction.interaction_type or 'interaction'}"
+                    ),
+                    _field("Summary", interaction.summary),
+                    _field("Follow-up", interaction.follow_up_notes),
                 ]
             )
 
@@ -98,22 +103,28 @@ class PersonDetailPanel(QTextEdit):
 def _title(text: str) -> str:
     """Return an ASCII title block."""
 
-    width = max(40, len(text) + 4)
-    border = "+" + "-" * width + "+"
-    return "\n".join([border, f"| {text.ljust(width - 2)} |", border])
+    border = "+" + "=" * PANEL_WIDTH + "+"
+    return "\n".join([border, _boxed_line(text.upper()), border])
 
 
 def _section(text: str) -> str:
-    """Return a compact ASCII section heading."""
+    """Return a prominent ASCII section heading."""
 
-    return f"-- {text} " + "-" * max(0, 48 - len(text))
+    border = "+" + "-" * PANEL_WIDTH + "+"
+    return "\n".join([border, _boxed_line(text), border])
 
 
-def _field(label: str, value: object, indent: str = "  ") -> str:
+def _subsection(text: str) -> str:
+    """Return a compact subsection heading."""
+
+    return f"  [{text}]"
+
+
+def _field(label: str, value: object) -> str:
     """Return an aligned label/value row."""
 
     text = str(value).strip() if value is not None else ""
-    return f"{indent}{label.ljust(17)}: {text or '-'}"
+    return f"  {label.upper().ljust(LABEL_WIDTH)} | {text or '-'}"
 
 
 def _block(text: str) -> str:
@@ -121,8 +132,8 @@ def _block(text: str) -> str:
 
     stripped = text.strip()
     if not stripped:
-        return "  -"
-    return "\n".join(f"  {line}" if line else "" for line in stripped.splitlines())
+        return _empty()
+    return "\n".join(f"  {line}" if line else "  " for line in stripped.splitlines())
 
 
 def _social_handle_lines(person: Person) -> list[str]:
@@ -130,5 +141,17 @@ def _social_handle_lines(person: Person) -> list[str]:
 
     handles = social_lines(person)
     if not handles:
-        return ["  -"]
+        return [_empty()]
     return [_field(label, value) for label, value in handles]
+
+
+def _empty(text: str = "-") -> str:
+    """Return a standard empty-state row."""
+
+    return f"  {text}"
+
+
+def _boxed_line(text: str) -> str:
+    """Return text padded inside a fixed-width ASCII box."""
+
+    return f"| {text.ljust(PANEL_WIDTH - 2)} |"
