@@ -11,7 +11,6 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
-    QSpinBox,
     QVBoxLayout,
     QWidget,
 )
@@ -64,9 +63,6 @@ class EditPersonDialog(QDialog):
         self.edit_socials_button = QPushButton("Edit Social Handles...")
         self.edit_socials_button.clicked.connect(self._edit_socials)
         self._refresh_socials_summary()
-        self.interval_spin = QSpinBox()
-        self.interval_spin.setRange(1, 3650)
-        self.interval_spin.setValue(person.contact_interval_days if person else 30)
         self.last_contacted_edit = QLineEdit(
             person.last_contacted_at.isoformat()
             if person and person.last_contacted_at
@@ -84,7 +80,6 @@ class EditPersonDialog(QDialog):
         form.addRow("Relationship", self.relationship_combo)
         form.addRow("Preferred method", self.method_edit)
         form.addRow("Social handles", self._create_socials_row())
-        form.addRow("Contact interval days", self.interval_spin)
         form.addRow("Last contacted (YYYY-MM-DD)", self.last_contacted_edit)
         form.addRow("Bio", self.bio_edit)
         form.addRow("Notes", self.notes_edit)
@@ -143,7 +138,7 @@ class EditPersonDialog(QDialog):
             relationship=normalize_relationship(self.relationship_combo.currentText()),
             preferred_contact_method=self.method_edit.text().strip(),
             socials=normalize_socials(self.socials),
-            contact_interval_days=self.interval_spin.value(),
+            contact_interval_days=existing.contact_interval_days if existing else 30,
             last_contacted_at=parse_date(self.last_contacted_edit.text()),
             bio=self.bio_edit.toPlainText().strip(),
             notes=self.notes_edit.toPlainText().strip(),

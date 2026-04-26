@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
 from keep_in_touch.app.app_config import AppConfig
 from keep_in_touch.domain.date_utils import today_local
 from keep_in_touch.domain.display import (
+    contact_age_text,
     date_text,
     display_name,
     social_lines,
@@ -668,7 +669,7 @@ class MainWindow(QMainWindow):
             f"Relationship: {person.relationship or '-'}",
             f"Preferred method: {person.preferred_contact_method or '-'}",
             f"Last contacted: {date_text(person.last_contacted_at)}",
-            f"Next contact: {date_text(person.next_contact_at, 'Not set')}",
+            f"Days since contact: {contact_age_text(person, today_local())}",
             f"Tags: {tags_text(person)}",
             "",
             "Bio:",

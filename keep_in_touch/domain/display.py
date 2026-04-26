@@ -2,6 +2,7 @@
 
 from datetime import date
 
+from keep_in_touch.domain.formulas import days_since_contact
 from keep_in_touch.domain.models import Person, SOCIAL_PLATFORMS
 
 
@@ -60,37 +61,25 @@ def date_text(value: date | None, fallback: str = "-") -> str:
     return value.isoformat() if value else fallback
 
 
-def contact_status(person: Person, today: date | None = None) -> str:
-    """Return a compact human-readable contact status.
+def days_since_contact_text(person: Person, today: date) -> str:
+    """Return a compact days-since-contact value for display."""
 
-    Args:
-        person: Person with recalculated contact fields.
-        today: Optional date for future/past wording. When omitted, overdue
-            status uses the person's recalculated urgency score.
-    """
-
-    if person.last_contacted_at is None:
-        return "Never contacted"
-    if person.next_contact_at is None:
-        return "Not scheduled"
-
-    if today is None:
-        if person.urgency_score > 0:
-            return _overdue_text(int(person.urgency_score))
-        return "On schedule"
-
-    days_until_contact = (person.next_contact_at - today).days
-    if days_until_contact < 0:
-        return _overdue_text(abs(days_until_contact))
-    if days_until_contact == 0:
-        return "Due today"
-
-    suffix = "day" if days_until_contact == 1 else "days"
-    return f"In {days_until_contact} {suffix}"
-
-
-def _overdue_text(days: int) -> str:
-    """Return overdue display text for a number of days."""
-
+    days = days_since_contact(person, today)
+    if days is None:
+        return "Never"
+    if days == 0:
+        return "Today"
     suffix = "day" if days == 1 else "days"
-    return f"{days} {suffix} overdue"
+    return f"{days} {suffix}"
+
+
+def contact_age_text(person: Person, today: date) -> str:
+    """Return a sentence-like contact age value for detail views."""
+
+    days = days_since_contact(person, today)
+    if days is None:
+        return "Never contacted"
+    if days == 0:
+        return "Contacted today"
+    suffix = "day" if days == 1 else "days"
+    return f"{days} {suffix} since contact"

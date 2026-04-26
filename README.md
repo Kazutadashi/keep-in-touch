@@ -8,14 +8,14 @@ The goal is not to replace your contacts app, calendar, notes app, or a full CRM
 
 ## What it does
 
-Keep in Touch gives you a clean list of people you want to stay connected with. Each person can have basic details, notes, relationship context, preferred contact method, and a contact interval.
+Keep in Touch gives you a clean list of people you want to stay connected with. Each person can have basic details, notes, relationship context, preferred contact method, social handles, and contact history.
 
-The app automatically calculates when you should reach out again based on the last logged interaction.
+The app shows how long it has been since you last contacted someone based on the last logged interaction.
 
 You can use it to:
 
 - Track friends, classmates, family, coworkers, mentors, and other personal connections
-- See who you may want to contact next
+- See how long it has been since you last contacted someone
 - Log conversations, calls, texts, or in-person interactions
 - Keep notes that help you have more thoughtful future conversations
 - Export your data for backup or analysis
@@ -91,7 +91,7 @@ python run_app.py
 
 ## Using the app
 
-When you open Keep in Touch, you will see a list of people and the next suggested contact date for each person.
+When you open Keep in Touch, you will see a list of people and how many days it has been since you last contacted each person.
 
 You can:
 
@@ -102,7 +102,7 @@ You can:
 - Mark that you contacted someone today
 - Export your people or interaction history to CSV
 
-Each time you log an interaction, the app updates that person’s last-contacted date and recalculates when you should reach out again.
+Each time you log an interaction, the app updates that person’s last-contacted date.
 
 ## Data and backups
 

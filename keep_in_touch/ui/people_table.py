@@ -9,7 +9,11 @@ from PySide6.QtCore import QPoint, Qt, Signal
 from PySide6.QtGui import QMouseEvent
 from PySide6.QtWidgets import QHeaderView, QTableWidget, QTableWidgetItem
 
-from keep_in_touch.domain.display import contact_status, display_name, tags_text
+from keep_in_touch.domain.display import (
+    days_since_contact_text,
+    display_name,
+    tags_text,
+)
 from keep_in_touch.domain.models import Person
 
 
@@ -28,16 +32,10 @@ def _name_cell(person: Person, today: date) -> str:
     return display_name(person)
 
 
-def _next_contact_cell(person: Person, today: date) -> str:
-    """Return next-contact column text."""
+def _days_since_contact_cell(person: Person, today: date) -> str:
+    """Return days-since-contact column text."""
 
-    return person.next_contact_at.isoformat() if person.next_contact_at else "Not set"
-
-
-def _status_cell(person: Person, today: date) -> str:
-    """Return status column text."""
-
-    return contact_status(person, today)
+    return days_since_contact_text(person, today)
 
 
 def _relationship_cell(person: Person, today: date) -> str:
@@ -72,8 +70,7 @@ class PeopleTable(QTableWidget):
 
     COLUMNS: ClassVar[list[PeopleTableColumn]] = [
         PeopleTableColumn("Name", 210, _name_cell),
-        PeopleTableColumn("Next Contact", 120, _next_contact_cell),
-        PeopleTableColumn("Status", 110, _status_cell),
+        PeopleTableColumn("Days Since Contact", 160, _days_since_contact_cell),
         PeopleTableColumn("Relationship", 130, _relationship_cell),
         PeopleTableColumn("Tags", 220, _tags_cell),
     ]

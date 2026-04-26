@@ -97,11 +97,13 @@ class PeopleService:
         self.save_people(self.list_people(today=today), today=today)
 
 
-def _person_sort_key(person: Person) -> tuple[int, str, float, str]:
-    """Sort overdue/soonest contacts first."""
+def _person_sort_key(person: Person) -> tuple[int, str, str]:
+    """Sort never-contacted people first, then oldest contacts."""
 
-    next_contact = (
-        person.next_contact_at.isoformat() if person.next_contact_at else "9999-12-31"
-    )
     has_never_contacted = 0 if person.last_contacted_at is None else 1
-    return (has_never_contacted, next_contact, -person.urgency_score, person.sort_name)
+    last_contacted = (
+        person.last_contacted_at.isoformat()
+        if person.last_contacted_at
+        else "0000-00-00"
+    )
+    return (has_never_contacted, last_contacted, person.sort_name)

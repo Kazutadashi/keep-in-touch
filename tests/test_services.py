@@ -35,7 +35,7 @@ def test_logging_interaction_updates_person(tmp_path) -> None:
     updated = people_service.get_person(person.id, today=date(2026, 4, 10))
     assert updated is not None
     assert updated.last_contacted_at == date(2026, 4, 10)
-    assert updated.next_contact_at == date(2026, 5, 10)
+    assert updated.next_contact_at is None
 
     interactions = interaction_service.list_for_person(person.id)
     assert len(interactions) == 1

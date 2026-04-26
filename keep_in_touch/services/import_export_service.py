@@ -27,10 +27,7 @@ PEOPLE_CSV_FIELDS = [
     "relationship",
     "preferred_contact_method",
     *[f"social_{key}" for key, _label in SOCIAL_PLATFORMS],
-    "contact_interval_days",
     "last_contacted_at",
-    "next_contact_at",
-    "urgency_score",
     "notes",
 ]
 

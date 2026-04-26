@@ -1,10 +1,12 @@
 """Read-only detail panel for one person."""
 
+from datetime import date
+
 from PySide6.QtGui import QFontDatabase
 from PySide6.QtWidgets import QTextEdit
 
 from keep_in_touch.domain.display import (
-    contact_status,
+    contact_age_text,
     date_text,
     display_name,
     middle_name,
@@ -57,12 +59,9 @@ class PersonDetailPanel(QTextEdit):
             _section("Social Handles"),
             *_social_handle_lines(person),
             "",
-            _section("Contact Rhythm"),
-            _field("Status", contact_status(person)),
-            _field("Interval", f"{person.contact_interval_days} days"),
+            _section("Contact History"),
+            _field("Days since", contact_age_text(person, date.today())),
             _field("Last contacted", date_text(person.last_contacted_at)),
-            _field("Next contact", date_text(person.next_contact_at, "Not set")),
-            _field("Urgency score", f"{person.urgency_score:g}"),
             "",
             _section("Bio"),
             _block(person.bio),
