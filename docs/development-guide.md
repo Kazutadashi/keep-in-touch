@@ -76,7 +76,7 @@ panels, menus, and user prompts.
 
 - `main_window.py`: top-level window, menus, action state, filtering, selection.
 - `people_table.py`: sortable people table and table-cell decoration.
-- `person_detail_panel.py`: copy-friendly ASCII detail view.
+- `person_detail_panel.py`: rich detail view with plain-text copy support.
 - `app_icon.py`: packaged application icon loader.
 - `dialogs/`: add/edit person, edit socials, log/edit interactions.
 
@@ -156,13 +156,14 @@ behavior.
 
 Edit `keep_in_touch/ui/person_detail_panel.py`.
 
-The detail pane is deliberately text-first. It uses `QTextEdit` so the full
-record is selectable and copyable. The ASCII rendering is ordinary Python string
-formatting, which keeps the pane easy to change without managing many nested
-widgets.
+The detail pane is deliberately light. It uses one rich `QTextEdit` for display
+and keeps a plain-text copy version available from the same source data. The
+panel avoids a large nested widget tree, but it can still use headings, spacing,
+and field styling.
 
-If you add data to the detail pane, prefer adding it to the relevant section in
-`person_detail_text()`.
+If you add data to the detail pane, add it to `person_detail_document()`. Both
+the HTML display and the plain-text copy renderer use that shared document, so
+you should not need to update two separate field lists.
 
 ### Change Add/Edit Person Fields
 

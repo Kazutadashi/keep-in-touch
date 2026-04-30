@@ -19,6 +19,7 @@ from keep_in_touch.domain.display import (
     tags_text,
 )
 from keep_in_touch.domain.models import Person
+from keep_in_touch.ui.theme import SCROLLBAR_STYLE
 
 PERSON_ID_ROLE = Qt.ItemDataRole.UserRole + 1
 
@@ -249,6 +250,7 @@ class PeopleTable(QTableWidget):
         self.horizontalHeader().setMinimumSectionSize(70)
         self.horizontalHeader().setStretchLastSection(True)
         self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        self.setStyleSheet(SCROLLBAR_STYLE)
         for index, column in enumerate(self.COLUMNS):
             self.setColumnWidth(index, column.width)
         self.itemSelectionChanged.connect(self._emit_selection_change)

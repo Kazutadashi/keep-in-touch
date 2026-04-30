@@ -3,7 +3,7 @@
 **Keep in Touch** is a local-first desktop application for maintaining personal relationship context. It gives you a structured place to remember who someone is, where you usually talk to them, when you last connected, what you discussed, and when to follow up. The project is intentionally modest in scope: it is not a CRM, calendar, contacts replacement, or cloud service. It is a focused personal tool for people who want a private, durable record of their real-world and online connections.
 
 <p align="center">
-  <img src="docs/images/app_preview_v3.png" alt="Keep in Touch app screenshot" width="900">
+  <img src="docs/images/app_preview_v4.png" alt="Keep in Touch app screenshot" width="900">
 </p>
 
 The screenshot uses generated example data, but it reflects the shape of the application. People are listed in a sortable table with practical fields such as name, days since last contact, birthday, relationship, and tags. Selecting a person opens a text-based detail panel with identity fields, contact information, social handles, notes, and interaction history. The interface is designed for quick scanning first and deeper context second.
