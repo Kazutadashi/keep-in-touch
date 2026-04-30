@@ -29,6 +29,9 @@ where = ["."]
 include = ["keep_in_touch*"]
 exclude = ["tests*", "examples*", "data*"]
 
+[tool.setuptools.package-data]
+keep_in_touch = ["assets/icons/*.svg"]
+
 [tool.ruff]
 line-length = 88
 target-version = "py311"

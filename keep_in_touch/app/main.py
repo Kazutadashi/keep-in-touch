@@ -6,6 +6,7 @@ from PySide6.QtWidgets import QApplication
 
 from keep_in_touch.app.app_config import AppConfig
 from keep_in_touch.storage.app_settings import load_remembered_data_dir
+from keep_in_touch.ui.app_icon import app_icon
 from keep_in_touch.ui.main_window import MainWindow
 
 
@@ -25,6 +26,7 @@ def main() -> int:
     """
 
     app = QApplication(sys.argv)
+    app.setWindowIcon(app_icon())
 
     remembered_data_dir = load_remembered_data_dir()
     config = AppConfig(data_dir=remembered_data_dir)

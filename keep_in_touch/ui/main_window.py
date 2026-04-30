@@ -44,6 +44,7 @@ from keep_in_touch.services.people_service import PeopleService
 from keep_in_touch.storage.app_paths import ensure_data_layout
 from keep_in_touch.storage.app_settings import save_remembered_data_dir
 from keep_in_touch.storage.jsonl_store import JsonlStore
+from keep_in_touch.ui.app_icon import app_icon
 from keep_in_touch.ui.dialogs.edit_person_dialog import EditPersonDialog
 from keep_in_touch.ui.dialogs.log_interaction_dialog import LogInteractionDialog
 from keep_in_touch.ui.people_table import PERSON_ID_ROLE, PeopleTable
@@ -74,6 +75,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.config = config
         self.setWindowTitle("Keep in Touch")
+        self.setWindowIcon(app_icon())
         self.setMinimumSize(980, 640)
 
         self.people_service: PeopleService | None = None

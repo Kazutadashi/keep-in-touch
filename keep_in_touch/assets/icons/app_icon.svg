@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Keep in Touch icon">
+  <defs>
+    <linearGradient id="surface" x1="44" y1="32" x2="212" y2="224" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6f4a8e"/>
+      <stop offset="1" stop-color="#2f6f69"/>
+    </linearGradient>
+    <linearGradient id="thread" x1="76" y1="78" x2="180" y2="166" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f5f3ff"/>
+      <stop offset="1" stop-color="#d8fff4"/>
+    </linearGradient>
+  </defs>
+  <rect x="24" y="24" width="208" height="208" rx="46" fill="url(#surface)"/>
+  <path
+    d="M68 72h120a18 18 0 0 1 18 18v74a18 18 0 0 1-18 18h-55l-34 27a8 8 0 0 1-13-6v-21H68a18 18 0 0 1-18-18V90a18 18 0 0 1 18-18Z"
+    fill="#111827"
+    opacity=".34"
+  />
+  <path
+    d="M68 62h120a18 18 0 0 1 18 18v74a18 18 0 0 1-18 18h-55l-34 27a8 8 0 0 1-13-6v-21H68a18 18 0 0 1-18-18V80a18 18 0 0 1 18-18Z"
+    fill="#f9fafb"
+    opacity=".94"
+  />
+  <path
+    d="M91 120l36-24 39 42"
+    fill="none"
+    stroke="url(#thread)"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    stroke-width="18"
+  />
+  <path
+    d="M91 120l36-24 39 42"
+    fill="none"
+    stroke="#3b2f4a"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    stroke-width="8"
+  />
+  <circle cx="91" cy="120" r="19" fill="#6f4a8e"/>
+  <circle cx="127" cy="96" r="19" fill="#2f6f69"/>
+  <circle cx="166" cy="138" r="19" fill="#6f4a8e"/>
+  <circle cx="91" cy="120" r="7" fill="#f9fafb"/>
+  <circle cx="127" cy="96" r="7" fill="#f9fafb"/>
+  <circle cx="166" cy="138" r="7" fill="#f9fafb"/>
+</svg>
