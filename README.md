@@ -46,3 +46,11 @@ To try the project with ready-made sample data, choose `File > Set Data Folder..
 The project is built around two primary records: people and interactions. People contain stable identity and relationship information, while interactions record dated contact events. Keeping those concerns separate makes the data easier to analyze later. For example, a simple script can count relationship types, measure direct contact field coverage, inspect social platform usage, find the oldest contact dates, or rank upcoming birthdays without scraping UI text.
 
 Unknown fields from newer or older versions are preserved where possible through `extra_fields`, so changing the schema does not need to destroy user data. New first-class fields should still be added intentionally across the model, serialization, import/export, UI, examples, and tests. See [Adding a New Field](docs/adding-new-field.md) for the full walkthrough.
+
+## Development
+
+If you want to understand or modify the project, start with the
+[Development Guide](docs/development-guide.md). It explains the app's layers,
+how data moves from JSONL files into the UI, where common changes belong, and
+how to debug or verify fixes. For schema changes, use
+[Adding a New Field](docs/adding-new-field.md) as the step-by-step checklist.
