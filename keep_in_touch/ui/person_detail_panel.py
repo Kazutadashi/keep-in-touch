@@ -6,9 +6,9 @@ from PySide6.QtGui import QFontDatabase
 from PySide6.QtWidgets import QTextEdit
 
 from keep_in_touch.domain.display import (
+    birthday_text,
     contact_age_text,
     contact_method_label,
-    birthday_text,
     date_text,
     display_name,
     middle_name,
@@ -17,25 +17,33 @@ from keep_in_touch.domain.display import (
 )
 from keep_in_touch.domain.models import Interaction, Person
 
-PANEL_WIDTH = 72
 LABEL_WIDTH = 19
+PANEL_WIDTH = 72
 
 
 class PersonDetailPanel(QTextEdit):
-    """Display person details and interaction history.
-
-    Example:
-        panel = PersonDetailPanel()
-        panel.clear_person()
-    """
+    """Display selectable, copy-friendly person details."""
 
     def __init__(self) -> None:
-        """Create a read-only monospace text panel."""
+        """Create a read-only text panel styled to fit the Qt application."""
 
         super().__init__()
         self.setReadOnly(True)
+        self.setAcceptRichText(False)
+        self.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
         self.setFont(QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont))
         self.setPlaceholderText("Select a person to see details.")
+        self.setStyleSheet(
+            "QTextEdit {"
+            "background: palette(base);"
+            "border: 1px solid palette(mid);"
+            "border-radius: 6px;"
+            "color: palette(text);"
+            "padding: 16px;"
+            "selection-background-color: palette(highlight);"
+            "selection-color: palette(highlighted-text);"
+            "}"
+        )
 
     def clear_person(self) -> None:
         """Clear the detail panel."""
@@ -45,51 +53,57 @@ class PersonDetailPanel(QTextEdit):
     def set_person(self, person: Person, interactions: list[Interaction]) -> None:
         """Render a person and their interaction history."""
 
-        name = display_name(person)
-        lines = [
-            _title(name),
-            "",
-            _section("Identity"),
-            _field("User ID", person.id),
-            _field("First name", person.first_name),
-            _field("Middle name", middle_name(person)),
-            _field("Last name", person.last_name),
-            _field("Nickname", person.nickname),
-            _field("Birthday", birthday_text(person, date.today())),
-            "",
-            _section("Connection"),
-            _field("Email", person.email),
-            _field("Phone", person.phone),
-            _field("Relationship", person.relationship),
-            _field(
-                "Preferred contact",
-                contact_method_label(person.preferred_contact_method),
-            ),
-            _field("Tags", tags_text(person)),
-            "",
-            _section("Social Handles"),
-            *_social_handle_lines(person),
-            "",
-            _section("Contact History"),
-            _field("Days since", contact_age_text(person, date.today())),
-            _field("Last contacted", date_text(person.last_contacted_at)),
-            "",
-            _section("Bio"),
-            _block(person.bio),
-            "",
-            _section("Notes"),
-            _block(person.notes),
-            "",
-            _section("Interaction History"),
-        ]
+        self.setPlainText(person_detail_text(person, interactions))
 
-        if not interactions:
-            lines.append(_empty("No interactions logged yet."))
 
-        for interaction in interactions:
-            lines.extend(["", *_interaction_block(interaction)])
+def person_detail_text(person: Person, interactions: list[Interaction]) -> str:
+    """Return the copy-friendly text shown in the detail panel."""
 
-        self.setPlainText("\n".join(lines))
+    name = display_name(person)
+    lines = [
+        _title(name),
+        "",
+        _section("Identity"),
+        _field("User ID", person.id),
+        _field("First name", person.first_name),
+        _field("Middle name", middle_name(person)),
+        _field("Last name", person.last_name),
+        _field("Nickname", person.nickname),
+        _field("Birthday", birthday_text(person, date.today())),
+        "",
+        _section("Connection"),
+        _field("Email", person.email),
+        _field("Phone", person.phone),
+        _field("Relationship", person.relationship),
+        _field(
+            "Preferred contact",
+            contact_method_label(person.preferred_contact_method),
+        ),
+        _field("Tags", tags_text(person)),
+        "",
+        _section("Social Handles"),
+        *_social_handle_lines(person),
+        "",
+        _section("Contact History"),
+        _field("Days since", contact_age_text(person, date.today())),
+        _field("Last contacted", date_text(person.last_contacted_at)),
+        "",
+        _section("Bio"),
+        _block(person.bio),
+        "",
+        _section("Notes"),
+        _block(person.notes),
+        "",
+        _section("Interaction History"),
+    ]
+
+    if not interactions:
+        lines.append(_empty("No interactions logged yet."))
+
+    for interaction in interactions:
+        lines.extend(["", *_interaction_block(interaction)])
+
+    return "\n".join(lines)
 
 
 def _title(text: str) -> str:
@@ -116,16 +130,13 @@ def _section(text: str) -> str:
     )
 
 
-def _subsection(text: str) -> str:
-    """Return a compact subsection heading."""
-
-    return f"  [{text}]"
-
-
 def _interaction_block(interaction: Interaction) -> list[str]:
     """Return an indented readable block for one interaction."""
 
-    title = f"{interaction.date.isoformat()} - {interaction.interaction_type or 'interaction'}"
+    title = (
+        f"{interaction.date.isoformat()} - "
+        f"{interaction.interaction_type or 'interaction'}"
+    )
     return [
         f"  ── {title}",
         f"     id   │ {interaction.id}",

@@ -12,8 +12,6 @@ class PeopleFilterCriteria:
     """Values used to narrow the people shown in the main table."""
 
     search_text: str = ""
-    relationship: str = ""
-    tag: str = ""
     last_contacted_from: date | None = None
     last_contacted_to: date | None = None
     birthday_month: int | None = None
@@ -33,14 +31,6 @@ def person_matches_filters(person: Person, criteria: PeopleFilterCriteria) -> bo
 
     query = criteria.search_text.strip().casefold()
     if query and query not in _searchable_text(person):
-        return False
-
-    relationship = criteria.relationship.strip().casefold()
-    if relationship and person.relationship.strip().casefold() != relationship:
-        return False
-
-    tag = criteria.tag.strip().casefold()
-    if tag and tag not in {person_tag.casefold() for person_tag in person.tags}:
         return False
 
     if not _date_in_range(

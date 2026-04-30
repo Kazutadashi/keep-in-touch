@@ -12,8 +12,6 @@ from PySide6.QtGui import QAction, QGuiApplication, QKeySequence
 from PySide6.QtWidgets import (
     QComboBox,
     QFileDialog,
-    QGroupBox,
-    QGridLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -87,6 +85,7 @@ class MainWindow(QMainWindow):
         self.people: list[Person] = []
         self.filtered_people: list[Person] = []
         self.data_folder_label = QLabel()
+        self.people_count_label = QLabel()
 
         self._create_actions()
         self._create_menu_bar()
@@ -214,7 +213,7 @@ class MainWindow(QMainWindow):
 
         splitter = QSplitter()
         splitter.addWidget(self._create_people_panel())
-        splitter.addWidget(self.detail_panel)
+        splitter.addWidget(self._create_detail_panel())
         splitter.setSizes([self.people_table.preferred_width(), 680])
         central_layout.addWidget(splitter)
 
@@ -225,70 +224,93 @@ class MainWindow(QMainWindow):
 
         panel = QWidget()
         layout = QVBoxLayout(panel)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(0, 0, 8, 0)
         layout.setSpacing(8)
+
+        title_row = QHBoxLayout()
+        title_row.setContentsMargins(0, 0, 0, 0)
+        title_row.setSpacing(8)
 
         title = QLabel("People")
         title.setObjectName("peopleListTitle")
-        layout.addWidget(title)
+        title_row.addWidget(title)
+
+        self.people_count_label.setObjectName("peopleCountLabel")
+        self.people_count_label.setText("(0 shown)")
+        self.people_count_label.setStyleSheet("color: palette(window-text);")
+        title_row.addWidget(self.people_count_label)
+        title_row.addStretch(1)
+        layout.addLayout(title_row)
         layout.addWidget(self._create_filter_panel())
         layout.addWidget(self.people_table)
         layout.addWidget(self._create_action_buttons())
 
         return panel
 
-    def _create_filter_panel(self) -> QGroupBox:
+    def _create_detail_panel(self) -> QWidget:
+        """Create the right-side detail panel with a matching title row."""
+
+        panel = QWidget()
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(8, 0, 0, 0)
+        layout.setSpacing(8)
+
+        self.detail_title_label = QLabel("Details")
+        self.detail_title_label.setObjectName("detailTitle")
+        self.detail_title_label.setStyleSheet("font-weight: 600;")
+        layout.addWidget(self.detail_title_label)
+        layout.addWidget(self.detail_panel)
+
+        return panel
+
+    def _create_filter_panel(self) -> QWidget:
         """Create controls for narrowing the people table."""
 
-        group_box = QGroupBox("Filters")
-        layout = QGridLayout(group_box)
-        layout.setContentsMargins(8, 8, 8, 8)
-        layout.setHorizontalSpacing(8)
-        layout.setVerticalSpacing(6)
+        panel = QWidget()
+        layout = QHBoxLayout(panel)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(6)
 
         self.search_filter_edit = QLineEdit()
-        self.search_filter_edit.setPlaceholderText("Name, notes, email, handle")
-        layout.addWidget(QLabel("Search"), 0, 0)
-        layout.addWidget(self.search_filter_edit, 0, 1, 1, 3)
-
-        self.relationship_filter_combo = QComboBox()
-        layout.addWidget(QLabel("Relationship"), 1, 0)
-        layout.addWidget(self.relationship_filter_combo, 1, 1)
-
-        self.tag_filter_combo = QComboBox()
-        layout.addWidget(QLabel("Tag"), 1, 2)
-        layout.addWidget(self.tag_filter_combo, 1, 3)
+        self.search_filter_edit.setPlaceholderText("Search name, tags, notes, email")
+        layout.addWidget(QLabel("Search"))
+        layout.addWidget(self.search_filter_edit, stretch=1)
 
         self.last_contact_from_filter_edit = QLineEdit()
         self.last_contact_from_filter_edit.setPlaceholderText("YYYY-MM-DD")
-        layout.addWidget(QLabel("Contact from"), 2, 0)
-        layout.addWidget(self.last_contact_from_filter_edit, 2, 1)
+        self.last_contact_from_filter_edit.setMaximumWidth(110)
+        layout.addWidget(QLabel("Last contact from"))
+        layout.addWidget(self.last_contact_from_filter_edit)
 
         self.last_contact_to_filter_edit = QLineEdit()
         self.last_contact_to_filter_edit.setPlaceholderText("YYYY-MM-DD")
-        layout.addWidget(QLabel("Contact to"), 2, 2)
-        layout.addWidget(self.last_contact_to_filter_edit, 2, 3)
+        self.last_contact_to_filter_edit.setMaximumWidth(110)
+        layout.addWidget(QLabel("to"))
+        layout.addWidget(self.last_contact_to_filter_edit)
 
         self.birthday_month_filter_combo = QComboBox()
-        layout.addWidget(QLabel("Birthday"), 3, 0)
-        layout.addWidget(self.birthday_month_filter_combo, 3, 1)
+        self.birthday_month_filter_combo.setMaximumWidth(150)
+        layout.addWidget(QLabel("Birthday"))
+        layout.addWidget(self.birthday_month_filter_combo)
 
         self.clear_filters_button = QPushButton("Clear Filters")
         self.clear_filters_button.clicked.connect(self.clear_filters)
-        layout.addWidget(self.clear_filters_button, 3, 3)
+        layout.addWidget(self.clear_filters_button)
 
         self._populate_static_filter_options()
-        return group_box
+        return panel
 
-    def _create_action_buttons(self) -> QGroupBox:
+    def _create_action_buttons(self) -> QWidget:
         """Create record-specific action buttons.
 
         Rare global actions, such as changing the data folder, live in the File
         menu instead of this button area.
         """
 
-        group_box = QGroupBox("Actions")
-        layout = QHBoxLayout(group_box)
+        panel = QWidget()
+        layout = QHBoxLayout(panel)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(6)
 
         self.add_person_button = QPushButton("Add Person")
         self.add_person_button.clicked.connect(self.add_person)
@@ -305,8 +327,9 @@ class MainWindow(QMainWindow):
         self.delete_selected_button = QPushButton("Delete")
         self.delete_selected_button.clicked.connect(self.delete_selected_person)
         layout.addWidget(self.delete_selected_button)
+        layout.addStretch(1)
 
-        return group_box
+        return panel
 
     def _create_status_bar(self) -> None:
         """Create a small status bar for context, not commands."""
@@ -326,10 +349,6 @@ class MainWindow(QMainWindow):
             self._show_people_context_menu
         )
         self.search_filter_edit.textChanged.connect(self._apply_people_filters)
-        self.relationship_filter_combo.currentIndexChanged.connect(
-            self._apply_people_filters
-        )
-        self.tag_filter_combo.currentIndexChanged.connect(self._apply_people_filters)
         self.last_contact_from_filter_edit.textChanged.connect(
             self._apply_people_filters
         )
@@ -385,17 +404,16 @@ class MainWindow(QMainWindow):
         if not self._has_data_folder():
             self.people = []
             self.filtered_people = []
-            self._populate_dynamic_filter_options()
             self.people_table.set_people([], today=today_local())
             self.detail_panel.setPlainText(NO_DATA_FOLDER_MESSAGE)
             self.data_folder_label.setText("No data folder selected")
+            self._update_people_count_label()
             self._update_action_state()
             return
 
         selected_id = self.people_table.selected_person_id()
         today = today_local()
         self.people = self._people_service().list_people(today=today)
-        self._populate_dynamic_filter_options()
         self.filtered_people = filter_people(self.people, self._filter_criteria())
         self.people_table.set_people(self.filtered_people, today=today)
 
@@ -410,6 +428,7 @@ class MainWindow(QMainWindow):
             self.detail_panel.clear_person()
 
         self._update_action_state()
+        self._update_people_count_label()
         self.statusBar().showMessage(self._people_count_message(), 3000)
 
     def add_person(self) -> None:
@@ -557,8 +576,6 @@ class MainWindow(QMainWindow):
         """Reset people-table filters."""
 
         self.search_filter_edit.clear()
-        self.relationship_filter_combo.setCurrentIndex(0)
-        self.tag_filter_combo.setCurrentIndex(0)
         self.last_contact_from_filter_edit.clear()
         self.last_contact_to_filter_edit.clear()
         self.birthday_month_filter_combo.setCurrentIndex(0)
@@ -699,20 +716,17 @@ class MainWindow(QMainWindow):
                 self.detail_panel.setPlainText(NO_DATA_FOLDER_MESSAGE)
 
         self._update_action_state()
+        self._update_people_count_label()
         if self._has_data_folder():
             self.statusBar().showMessage(self._people_count_message(), 3000)
 
     def _filter_criteria(self) -> PeopleFilterCriteria:
         """Build filter criteria from the current UI controls."""
 
-        relationship = self.relationship_filter_combo.currentData()
-        tag = self.tag_filter_combo.currentData()
         birthday_month = self.birthday_month_filter_combo.currentData()
 
         return PeopleFilterCriteria(
             search_text=self.search_filter_edit.text(),
-            relationship=relationship if isinstance(relationship, str) else "",
-            tag=tag if isinstance(tag, str) else "",
             last_contacted_from=self._filter_date(
                 self.last_contact_from_filter_edit.text()
             ),
@@ -750,52 +764,24 @@ class MainWindow(QMainWindow):
         ):
             self.birthday_month_filter_combo.addItem(month_name, month_number)
 
-    def _populate_dynamic_filter_options(self) -> None:
-        """Refresh tag and relationship filter choices from loaded people."""
-
-        current_relationship = self.relationship_filter_combo.currentData()
-        current_tag = self.tag_filter_combo.currentData()
-
-        self.relationship_filter_combo.blockSignals(True)
-        self.tag_filter_combo.blockSignals(True)
-
-        self.relationship_filter_combo.clear()
-        self.relationship_filter_combo.addItem("Any relationship", "")
-        relationships = sorted(
-            {
-                person.relationship.strip()
-                for person in self.people
-                if person.relationship.strip()
-            },
-            key=str.casefold,
-        )
-        for relationship in relationships:
-            self.relationship_filter_combo.addItem(relationship, relationship)
-
-        self.tag_filter_combo.clear()
-        self.tag_filter_combo.addItem("Any tag", "")
-        tags = sorted(_all_tags(self.people), key=str.casefold)
-        for tag in tags:
-            self.tag_filter_combo.addItem(tag, tag)
-
-        self._restore_combo_data(self.relationship_filter_combo, current_relationship)
-        self._restore_combo_data(self.tag_filter_combo, current_tag)
-
-        self.relationship_filter_combo.blockSignals(False)
-        self.tag_filter_combo.blockSignals(False)
-
-    def _restore_combo_data(self, combo: QComboBox, value: object) -> None:
-        """Restore a combo selection by item data, falling back to the first item."""
-
-        index = combo.findData(value)
-        combo.setCurrentIndex(index if index >= 0 else 0)
-
     def _people_count_message(self) -> str:
         """Return the status-bar count text for current filters."""
 
         if len(self.filtered_people) == len(self.people):
             return f"Loaded {len(self.people)} people."
         return f"Showing {len(self.filtered_people)} of {len(self.people)} people."
+
+    def _update_people_count_label(self) -> None:
+        """Update the count beside the people title."""
+
+        if not self.people:
+            self.people_count_label.setText("(0 shown)")
+        elif len(self.filtered_people) == len(self.people):
+            self.people_count_label.setText(f"({len(self.people)} shown)")
+        else:
+            self.people_count_label.setText(
+                f"({len(self.filtered_people)} of {len(self.people)} shown)"
+            )
 
     def _show_person(self, person_id: str) -> None:
         """Display one person's details."""
@@ -1025,8 +1011,6 @@ class MainWindow(QMainWindow):
         self.clear_filters_button.setEnabled(has_data_folder)
         for widget in (
             self.search_filter_edit,
-            self.relationship_filter_combo,
-            self.tag_filter_combo,
             self.last_contact_from_filter_edit,
             self.last_contact_to_filter_edit,
             self.birthday_month_filter_combo,
@@ -1045,9 +1029,3 @@ def _interaction_summary_lines(interaction: Interaction) -> list[str]:
         f"Summary: {interaction.summary or '-'}",
         f"Follow-up: {interaction.follow_up_notes or '-'}",
     ]
-
-
-def _all_tags(people: list[Person]) -> set[str]:
-    """Return all non-empty tags used by the provided people."""
-
-    return {tag.strip() for person in people for tag in person.tags if tag.strip()}
