@@ -6,8 +6,8 @@ from datetime import date
 from typing import ClassVar
 
 from PySide6.QtCore import QPoint, Qt, Signal
-from PySide6.QtGui import QBrush, QColor, QFont, QMouseEvent
-from PySide6.QtWidgets import QHeaderView, QTableWidget, QTableWidgetItem
+from PySide6.QtGui import QBrush, QColor, QFont, QMouseEvent, QPalette
+from PySide6.QtWidgets import QApplication, QHeaderView, QTableWidget, QTableWidgetItem
 
 from keep_in_touch.domain.formulas import days_since_contact
 from keep_in_touch.domain.display import (
@@ -96,28 +96,36 @@ def _decorate_birthday_cell(
 
     if days == 0:
         item.setText("BIRTHDAY TODAY")
-        item.setBackground(QBrush(QColor("#2f6f4e")))
-        item.setForeground(QBrush(QColor("#edf7f0")))
+        item.setBackground(QBrush(_palette_color(QPalette.ColorRole.Highlight)))
+        item.setForeground(QBrush(_palette_color(QPalette.ColorRole.HighlightedText)))
         font = item.font()
         font.setBold(True)
         font.setWeight(QFont.Weight.Bold)
         item.setFont(font)
     else:
-        item.setBackground(QBrush(_birthday_proximity_color(days)))
-        item.setForeground(QBrush(QColor("#f8fafc")))
+        background = _birthday_proximity_color(days)
+        item.setBackground(QBrush(background))
+        item.setForeground(QBrush(_readable_text_color(background)))
 
     item.setToolTip(_birthday_tooltip(person, today, days))
 
 
 def _birthday_proximity_color(days: int) -> QColor:
-    """Return a calm dark blue-to-green shade based on birthday proximity."""
+    """Return a theme-aware highlight shade based on birthday proximity."""
 
-    far_color = QColor("#1f2937")
-    near_color = QColor("#285f48")
+    base_color = _palette_color(QPalette.ColorRole.Base)
+    highlight_color = _palette_color(QPalette.ColorRole.Highlight)
     progress = 1.0 - min(days, 180) / 180
-    red = _interpolate(far_color.red(), near_color.red(), progress)
-    green = _interpolate(far_color.green(), near_color.green(), progress)
-    blue = _interpolate(far_color.blue(), near_color.blue(), progress)
+    highlight_weight = 0.18 + progress * 0.58
+    return _mix_color(base_color, highlight_color, highlight_weight)
+
+
+def _mix_color(start: QColor, end: QColor, progress: float) -> QColor:
+    """Return a color between two colors."""
+
+    red = _interpolate(start.red(), end.red(), progress)
+    green = _interpolate(start.green(), end.green(), progress)
+    blue = _interpolate(start.blue(), end.blue(), progress)
     return QColor(red, green, blue)
 
 
@@ -125,6 +133,26 @@ def _interpolate(start: int, end: int, progress: float) -> int:
     """Return an integer between two channel values."""
 
     return round(start + (end - start) * progress)
+
+
+def _palette_color(role: QPalette.ColorRole) -> QColor:
+    """Return a color from the active application palette."""
+
+    application = QApplication.instance()
+    if application is not None:
+        return application.palette().color(role)
+    return QPalette().color(role)
+
+
+def _readable_text_color(background: QColor) -> QColor:
+    """Return black or white text based on background brightness."""
+
+    luminance = (
+        0.2126 * background.red()
+        + 0.7152 * background.green()
+        + 0.0722 * background.blue()
+    )
+    return QColor("#111827") if luminance > 150 else QColor("#f9fafb")
 
 
 def _birthday_tooltip(person: Person, today: date, days: int) -> str:
