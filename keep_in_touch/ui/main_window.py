@@ -4,15 +4,19 @@ This module owns the top-level PySide6 window layout only. The window delegates
 application workflows to services and keeps business logic out of the UI layer.
 """
 
+from datetime import date
 from pathlib import Path
 
 from PySide6.QtCore import QPoint, QSize, Qt
 from PySide6.QtGui import QAction, QGuiApplication, QKeySequence
 from PySide6.QtWidgets import (
+    QComboBox,
     QFileDialog,
     QGroupBox,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QMainWindow,
     QMenu,
     QMessageBox,
@@ -25,7 +29,7 @@ from PySide6.QtWidgets import (
 
 from keep_in_touch import __author__, __version__
 from keep_in_touch.app.app_config import AppConfig
-from keep_in_touch.domain.date_utils import today_local
+from keep_in_touch.domain.date_utils import parse_date, today_local
 from keep_in_touch.domain.display import (
     contact_age_text,
     contact_method_label,
@@ -35,6 +39,7 @@ from keep_in_touch.domain.display import (
     tags_text,
 )
 from keep_in_touch.domain.models import Interaction, Person
+from keep_in_touch.domain.person_filters import PeopleFilterCriteria, filter_people
 from keep_in_touch.services.import_export_service import ImportExportService
 from keep_in_touch.services.interaction_service import InteractionService
 from keep_in_touch.services.people_service import PeopleService
@@ -80,6 +85,7 @@ class MainWindow(QMainWindow):
         self.people_table = PeopleTable()
         self.detail_panel = PersonDetailPanel()
         self.people: list[Person] = []
+        self.filtered_people: list[Person] = []
         self.data_folder_label = QLabel()
 
         self._create_actions()
@@ -141,6 +147,10 @@ class MainWindow(QMainWindow):
         self.clear_selection_action.setShortcut(QKeySequence.StandardKey.Cancel)
         self.clear_selection_action.triggered.connect(self.clear_selection)
 
+        self.clear_filters_action = QAction("Clear Filters", self)
+        self.clear_filters_action.setShortcut("Ctrl+Shift+F")
+        self.clear_filters_action.triggered.connect(self.clear_filters)
+
         self.import_people_action = QAction("Import People...", self)
         self.import_people_action.triggered.connect(self.import_people)
 
@@ -189,6 +199,7 @@ class MainWindow(QMainWindow):
 
         view_menu = self.menuBar().addMenu("&View")
         view_menu.addAction(self.refresh_action)
+        view_menu.addAction(self.clear_filters_action)
 
         help_menu = self.menuBar().addMenu("&Help")
         help_menu.addAction(self.about_action)
@@ -220,10 +231,54 @@ class MainWindow(QMainWindow):
         title = QLabel("People")
         title.setObjectName("peopleListTitle")
         layout.addWidget(title)
+        layout.addWidget(self._create_filter_panel())
         layout.addWidget(self.people_table)
         layout.addWidget(self._create_action_buttons())
 
         return panel
+
+    def _create_filter_panel(self) -> QGroupBox:
+        """Create controls for narrowing the people table."""
+
+        group_box = QGroupBox("Filters")
+        layout = QGridLayout(group_box)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setHorizontalSpacing(8)
+        layout.setVerticalSpacing(6)
+
+        self.search_filter_edit = QLineEdit()
+        self.search_filter_edit.setPlaceholderText("Name, notes, email, handle")
+        layout.addWidget(QLabel("Search"), 0, 0)
+        layout.addWidget(self.search_filter_edit, 0, 1, 1, 3)
+
+        self.relationship_filter_combo = QComboBox()
+        layout.addWidget(QLabel("Relationship"), 1, 0)
+        layout.addWidget(self.relationship_filter_combo, 1, 1)
+
+        self.tag_filter_combo = QComboBox()
+        layout.addWidget(QLabel("Tag"), 1, 2)
+        layout.addWidget(self.tag_filter_combo, 1, 3)
+
+        self.last_contact_from_filter_edit = QLineEdit()
+        self.last_contact_from_filter_edit.setPlaceholderText("YYYY-MM-DD")
+        layout.addWidget(QLabel("Contact from"), 2, 0)
+        layout.addWidget(self.last_contact_from_filter_edit, 2, 1)
+
+        self.last_contact_to_filter_edit = QLineEdit()
+        self.last_contact_to_filter_edit.setPlaceholderText("YYYY-MM-DD")
+        layout.addWidget(QLabel("Contact to"), 2, 2)
+        layout.addWidget(self.last_contact_to_filter_edit, 2, 3)
+
+        self.birthday_month_filter_combo = QComboBox()
+        layout.addWidget(QLabel("Birthday"), 3, 0)
+        layout.addWidget(self.birthday_month_filter_combo, 3, 1)
+
+        self.clear_filters_button = QPushButton("Clear Filters")
+        self.clear_filters_button.clicked.connect(self.clear_filters)
+        layout.addWidget(self.clear_filters_button, 3, 3)
+
+        self._populate_static_filter_options()
+        return group_box
 
     def _create_action_buttons(self) -> QGroupBox:
         """Create record-specific action buttons.
@@ -269,6 +324,18 @@ class MainWindow(QMainWindow):
         self.people_table.itemSelectionChanged.connect(self._update_action_state)
         self.people_table.customContextMenuRequested.connect(
             self._show_people_context_menu
+        )
+        self.search_filter_edit.textChanged.connect(self._apply_people_filters)
+        self.relationship_filter_combo.currentIndexChanged.connect(
+            self._apply_people_filters
+        )
+        self.tag_filter_combo.currentIndexChanged.connect(self._apply_people_filters)
+        self.last_contact_from_filter_edit.textChanged.connect(
+            self._apply_people_filters
+        )
+        self.last_contact_to_filter_edit.textChanged.connect(self._apply_people_filters)
+        self.birthday_month_filter_combo.currentIndexChanged.connect(
+            self._apply_people_filters
         )
 
     def _configure_services_from_config(self) -> None:
@@ -317,6 +384,8 @@ class MainWindow(QMainWindow):
 
         if not self._has_data_folder():
             self.people = []
+            self.filtered_people = []
+            self._populate_dynamic_filter_options()
             self.people_table.set_people([], today=today_local())
             self.detail_panel.setPlainText(NO_DATA_FOLDER_MESSAGE)
             self.data_folder_label.setText("No data folder selected")
@@ -326,18 +395,22 @@ class MainWindow(QMainWindow):
         selected_id = self.people_table.selected_person_id()
         today = today_local()
         self.people = self._people_service().list_people(today=today)
-        self.people_table.set_people(self.people, today=today)
+        self._populate_dynamic_filter_options()
+        self.filtered_people = filter_people(self.people, self._filter_criteria())
+        self.people_table.set_people(self.filtered_people, today=today)
 
         self.data_folder_label.setText(f"Data folder: {self.config.require_data_dir()}")
 
-        if selected_id and any(person.id == selected_id for person in self.people):
+        if selected_id and any(
+            person.id == selected_id for person in self.filtered_people
+        ):
             self._select_person_by_id(selected_id)
             self._show_person(selected_id)
         else:
             self.detail_panel.clear_person()
 
         self._update_action_state()
-        self.statusBar().showMessage(f"Loaded {len(self.people)} people.", 3000)
+        self.statusBar().showMessage(self._people_count_message(), 3000)
 
     def add_person(self) -> None:
         """Open the add-person dialog."""
@@ -480,6 +553,17 @@ class MainWindow(QMainWindow):
         self.detail_panel.clear_person()
         self._update_action_state()
 
+    def clear_filters(self) -> None:
+        """Reset people-table filters."""
+
+        self.search_filter_edit.clear()
+        self.relationship_filter_combo.setCurrentIndex(0)
+        self.tag_filter_combo.setCurrentIndex(0)
+        self.last_contact_from_filter_edit.clear()
+        self.last_contact_to_filter_edit.clear()
+        self.birthday_month_filter_combo.setCurrentIndex(0)
+        self._apply_people_filters()
+
     def export_people(self) -> None:
         """Export people to a chosen CSV or JSONL file."""
 
@@ -593,6 +677,125 @@ class MainWindow(QMainWindow):
         """Return a person from the current in-memory list by ID."""
 
         return next((person for person in self.people if person.id == person_id), None)
+
+    def _apply_people_filters(self, *_args: object) -> None:
+        """Refresh the people table using the current filter controls."""
+
+        if not hasattr(self, "people_table"):
+            return
+
+        selected_id = self.people_table.selected_person_id()
+        self.filtered_people = filter_people(self.people, self._filter_criteria())
+        self.people_table.set_people(self.filtered_people, today=today_local())
+
+        if selected_id and any(
+            person.id == selected_id for person in self.filtered_people
+        ):
+            self._select_person_by_id(selected_id)
+        else:
+            if self._has_data_folder():
+                self.detail_panel.clear_person()
+            else:
+                self.detail_panel.setPlainText(NO_DATA_FOLDER_MESSAGE)
+
+        self._update_action_state()
+        if self._has_data_folder():
+            self.statusBar().showMessage(self._people_count_message(), 3000)
+
+    def _filter_criteria(self) -> PeopleFilterCriteria:
+        """Build filter criteria from the current UI controls."""
+
+        relationship = self.relationship_filter_combo.currentData()
+        tag = self.tag_filter_combo.currentData()
+        birthday_month = self.birthday_month_filter_combo.currentData()
+
+        return PeopleFilterCriteria(
+            search_text=self.search_filter_edit.text(),
+            relationship=relationship if isinstance(relationship, str) else "",
+            tag=tag if isinstance(tag, str) else "",
+            last_contacted_from=self._filter_date(
+                self.last_contact_from_filter_edit.text()
+            ),
+            last_contacted_to=self._filter_date(
+                self.last_contact_to_filter_edit.text()
+            ),
+            birthday_month=birthday_month if isinstance(birthday_month, int) else None,
+        )
+
+    def _filter_date(self, value: str) -> date | None:
+        """Parse a filter date, treating blank or invalid input as unset."""
+
+        return parse_date(value)
+
+    def _populate_static_filter_options(self) -> None:
+        """Populate filter options that do not depend on loaded people."""
+
+        self.birthday_month_filter_combo.addItem("Any month", None)
+        for month_number, month_name in enumerate(
+            [
+                "January",
+                "February",
+                "March",
+                "April",
+                "May",
+                "June",
+                "July",
+                "August",
+                "September",
+                "October",
+                "November",
+                "December",
+            ],
+            start=1,
+        ):
+            self.birthday_month_filter_combo.addItem(month_name, month_number)
+
+    def _populate_dynamic_filter_options(self) -> None:
+        """Refresh tag and relationship filter choices from loaded people."""
+
+        current_relationship = self.relationship_filter_combo.currentData()
+        current_tag = self.tag_filter_combo.currentData()
+
+        self.relationship_filter_combo.blockSignals(True)
+        self.tag_filter_combo.blockSignals(True)
+
+        self.relationship_filter_combo.clear()
+        self.relationship_filter_combo.addItem("Any relationship", "")
+        relationships = sorted(
+            {
+                person.relationship.strip()
+                for person in self.people
+                if person.relationship.strip()
+            },
+            key=str.casefold,
+        )
+        for relationship in relationships:
+            self.relationship_filter_combo.addItem(relationship, relationship)
+
+        self.tag_filter_combo.clear()
+        self.tag_filter_combo.addItem("Any tag", "")
+        tags = sorted(_all_tags(self.people), key=str.casefold)
+        for tag in tags:
+            self.tag_filter_combo.addItem(tag, tag)
+
+        self._restore_combo_data(self.relationship_filter_combo, current_relationship)
+        self._restore_combo_data(self.tag_filter_combo, current_tag)
+
+        self.relationship_filter_combo.blockSignals(False)
+        self.tag_filter_combo.blockSignals(False)
+
+    def _restore_combo_data(self, combo: QComboBox, value: object) -> None:
+        """Restore a combo selection by item data, falling back to the first item."""
+
+        index = combo.findData(value)
+        combo.setCurrentIndex(index if index >= 0 else 0)
+
+    def _people_count_message(self) -> str:
+        """Return the status-bar count text for current filters."""
+
+        if len(self.filtered_people) == len(self.people):
+            return f"Loaded {len(self.people)} people."
+        return f"Showing {len(self.filtered_people)} of {len(self.people)} people."
 
     def _show_person(self, person_id: str) -> None:
         """Display one person's details."""
@@ -800,6 +1003,7 @@ class MainWindow(QMainWindow):
             self.export_interactions_action,
             self.refresh_action,
             self.add_person_action,
+            self.clear_filters_action,
         ):
             action.setEnabled(has_data_folder)
 
@@ -818,6 +1022,16 @@ class MainWindow(QMainWindow):
         self.edit_selected_button.setEnabled(has_selection)
         self.log_interaction_button.setEnabled(has_selection)
         self.delete_selected_button.setEnabled(has_selection)
+        self.clear_filters_button.setEnabled(has_data_folder)
+        for widget in (
+            self.search_filter_edit,
+            self.relationship_filter_combo,
+            self.tag_filter_combo,
+            self.last_contact_from_filter_edit,
+            self.last_contact_to_filter_edit,
+            self.birthday_month_filter_combo,
+        ):
+            widget.setEnabled(has_data_folder)
 
 
 def _interaction_summary_lines(interaction: Interaction) -> list[str]:
@@ -831,3 +1045,9 @@ def _interaction_summary_lines(interaction: Interaction) -> list[str]:
         f"Summary: {interaction.summary or '-'}",
         f"Follow-up: {interaction.follow_up_notes or '-'}",
     ]
+
+
+def _all_tags(people: list[Person]) -> set[str]:
+    """Return all non-empty tags used by the provided people."""
+
+    return {tag.strip() for person in people for tag in person.tags if tag.strip()}
